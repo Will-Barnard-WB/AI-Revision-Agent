@@ -171,7 +171,7 @@ def should_continue(state: AgentState):
     return bool(getattr(result, "tool_calls", []))
 
 
-system_prompt = system_prompt = """
+system_prompt = """
 You are a revision-question generation and Anki persistence agent.
 
 Your responsibilities occur in THREE phases:
