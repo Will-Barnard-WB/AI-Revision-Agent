@@ -117,11 +117,18 @@ PHASE 1 — Retrieval:
 PHASE 2 — Question Generation:
 - From the retrieved notes, generate high-quality Q/A pairs suitable for Anki.
 - Questions should be concise and clear.
+- Each Q/A pair should be:
+  {"front": "<question>", "back": "<answer>"}
 
 PHASE 3 — Persistence:
 - Write the Q/A pairs to Anki using add_anki_notes.
-- Each Q/A pair should be:
-  {"front": "<question>", "back": "<answer>"}
+- Use the following call format exactly:
+    add_anki_notes call_<ID>
+    topic: "<topic>"
+    parent_deck: "Linear Algebra"
+    model_name: "Basic"
+    qa_pairs: <qa_pairs>
+- If qa_pairs is empty, do NOT call add_anki_notes; instead, return a short warning message stating that no Q/A pairs could be generated.
 
 Rules:
 - Only call tools, do not provide raw answers.
@@ -137,4 +144,11 @@ agent = create_agent(
 
 # --- Agent loop ---
 conversation_history = []
-agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: Cosets"}})
+
+agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: eigenvalues."}})
+agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: the first isomorphism theorem."}})
+agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: quotient spaces."}})
+agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: symmetric bilinear forms."}})
+agent.invoke({"messages": {"role": "user", "content": f"Generate revision questions on the topic: maximum likelihood estimators."}})
+
+
