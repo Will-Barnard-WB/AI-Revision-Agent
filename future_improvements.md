@@ -7,3 +7,6 @@
     Next Step: You might want to add a "Max Iterations" check or a more descriptive instruction telling the LLM: "If you find a definition and a proof, stop searching and generate the cards."
 
 4. Create custom anki-connect MCP server and connect to agent. Include the necessary tools - e.g. create deck, create flashcards etc
+
+4. Field values of evaluators? 
+5. Max depth / iterations or ways for LLMs to stop when stuck.
