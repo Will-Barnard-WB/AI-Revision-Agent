@@ -5,7 +5,7 @@ This script runs the agent on a dataset and evaluates the outputs.
 from langsmith import Client, evaluate
 from langsmith.schemas import Run, Example
 from dotenv import load_dotenv
-from Agents.agent_react import agent
+from agent_react import agent
 import re
 
 load_dotenv()
