@@ -35,17 +35,21 @@ async def create_deck(name: str) -> dict:
 @mcp.tool(description="List all flashcards in an existing deck. Returns the front, back, and note ID for each card.")
 async def list_cards(deck_name: str) -> List[dict]:
     """Return all cards in a deck."""
-    note_ids = await anki_req("findNotes", {"query": f"deck:'{deck_name}'"})
+    # Use the correct AnkiConnect query format: deck:"Deck Name"
+    query = f'deck:"{deck_name}"'
+    note_ids = await anki_req("findNotes", {"query": query})
+    print(f"[list_cards] Queried deck: {deck_name}, note_ids: {note_ids}")
     if not note_ids:
         return []
     notes = await anki_req("notesInfo", {"notes": note_ids})
+    print(f"[list_cards] notesInfo: {notes}")
     results = []
     for n in notes:
-        fields = n["fields"]
+        fields = n.get("fields", {})
         results.append({
-            "noteId": n["noteId"],
-            "front": fields["Front"]["value"],
-            "back": fields["Back"]["value"],
+            "noteId": n.get("noteId"),
+            "front": fields.get("Front", {}).get("value", ""),
+            "back": fields.get("Back", {}).get("value", ""),
         })
     return results
 

@@ -40,8 +40,13 @@ INSTRUCTIONS = (
 
 flashcard_generator_sub_agent = {
     "name": "flashcard-generator",
-    "description": "Delegate flashcard generation to this sub-agent. Provide topic name and relevant note excerpts. Sub-agent will generate 5-10 high-quality flashcards for the topic.",
-    "system_prompt": FLASHCARD_GENERATOR_INSTRUCTIONS.format(date=current_date),
+    "description": (
+        "Delegate flashcard generation to this sub-agent. "
+        "You MUST provide both a topic name and relevant note excerpts (retrieved via retrieval_tool) as arguments. "
+        "If note excerpts are missing, the sub-agent will refuse to generate flashcards. "
+        "This ensures all flashcards are grounded in the user's actual notes, not internal knowledge."
+    ),
+    "system_prompt": FLASHCARD_GENERATOR_INSTRUCTIONS.format(date=current_date) + "\n\nIMPORTANT: Only generate flashcards if you receive both a topic name and relevant note excerpts. If note excerpts are missing, respond: 'ERROR: Note excerpts missing. Cannot generate flashcards.'",
     "tools": [tavily_search, think_tool],
 }
 
@@ -66,7 +71,7 @@ async def main():
             "messages": [
                 {
                     "role": "user",
-                    "content": "Generate revision flashcards on my lecture notes and add them to my anki account.",
+                    "content": "What flashcards from my anki do I have to do with bases?",
                 }
             ],
         },
