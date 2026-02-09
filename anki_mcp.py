@@ -38,11 +38,9 @@ async def list_cards(deck_name: str) -> List[dict]:
     # Use the correct AnkiConnect query format: deck:"Deck Name"
     query = f'deck:"{deck_name}"'
     note_ids = await anki_req("findNotes", {"query": query})
-    print(f"[list_cards] Queried deck: {deck_name}, note_ids: {note_ids}")
     if not note_ids:
         return []
     notes = await anki_req("notesInfo", {"notes": note_ids})
-    print(f"[list_cards] notesInfo: {notes}")
     results = []
     for n in notes:
         fields = n.get("fields", {})

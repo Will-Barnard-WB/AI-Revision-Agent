@@ -71,7 +71,7 @@ async def main():
             "messages": [
                 {
                     "role": "user",
-                    "content": "What flashcards from my anki do I have to do with bases?",
+                    "content": "What flashcards from my ankido I have to do with bases?",
                 }
             ],
         },
