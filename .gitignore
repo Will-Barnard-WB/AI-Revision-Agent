@@ -1,1 +1,5 @@
 .env
+
+# Ignore large database and binary files
+chroma.sqlite3
+f4ecda79-9e4f-425b-8a9d-7deb33e2e49d/data_level0.bin
