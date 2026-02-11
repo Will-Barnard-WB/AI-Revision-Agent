@@ -3,6 +3,10 @@ from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
 import asyncio 
 
+
+from deepagents.backends import FilesystemBackend
+from langgraph.checkpoint.memory import MemorySaver
+
 from utils import format_messages
 from tools import retrieval_tool
 
@@ -51,31 +55,65 @@ flashcard_generator_sub_agent = {
 }
 
 
+
 async def main():
-    
     mcp_tools = await client.get_tools()
-
     new_tools = [retrieval_tool, think_tool] + mcp_tools
-
     model = init_chat_model(model="openai:gpt-4o-mini", temperature=0.0)
+
+    # Human-in-the-loop checkpointer
+    checkpointer = MemorySaver()
+
+    # Configure interrupt_on for write_file tool
+    interrupt_on = {
+        "write_file": {"allowed_decisions": ["approve", "reject"]},
+    }
 
     agent = create_deep_agent(
         model=model,
         tools=new_tools,
         system_prompt=INSTRUCTIONS,
         subagents=[flashcard_generator_sub_agent],
+        backend=FilesystemBackend(root_dir=".", virtual_mode=False),
+        interrupt_on=interrupt_on,
+        checkpointer=checkpointer,
     )
+
+    import uuid
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 
     result = await agent.ainvoke(
         {
             "messages": [
                 {
                     "role": "user",
-                    "content": "What flashcards from my ankido I have to do with bases?",
+                    "content": "Can you go through my pdf revision notes in the files folder and also my anki flashcard decks and find anything to do with jordan normal form that i need to know.",
                 }
             ],
         },
+        config=config
     )
+
+    # Handle interrupts if present
+    if result.get("__interrupt__"):
+        interrupts = result["__interrupt__"][0].value
+        action_requests = interrupts["action_requests"]
+        review_configs = interrupts["review_configs"]
+        config_map = {cfg["action_name"]: cfg for cfg in review_configs}
+        decisions = []
+        for action in action_requests:
+            review_config = config_map[action["name"]]
+            print(f"Tool: {action['name']}")
+            print(f"Arguments: {action['args']['file_path']}")
+            print(f"Allowed decisions: {review_config['allowed_decisions']}")
+            # For now, auto-approve; replace with input() for real HITL
+            user_input = input(f"Enter decision for {action['name']} (allowed: {review_config['allowed_decisions']}): ")
+            decisions.append({"type": user_input})
+        from langgraph.types import Command
+        result = await agent.ainvoke(
+            Command(resume={"decisions": decisions}),
+            config=config
+        )
 
     format_messages(result["messages"])
 

@@ -2,6 +2,17 @@
 
 REVISION_WORKFLOW_INSTRUCTIONS = """# Revision Flashcard Generation Workflow
 
+
+## Current Working Directory
+
+The filesystem backend is operating in: `/Users/willbarnard/Documents/RevisionAgent/AgentOutput`
+
+**IMPORTANT - Path Handling:**
+- All file paths must be absolute paths
+- To save files, construct the full path: `/Users/willbarnard/Documents/RevisionAgent/AgentOutput/filename.md`
+- Example: To create 'notes.md', use `/Users/willbarnard/Documents/RevisionAgent/AgentOutput/notes.md`
+
+
 Follow this workflow for all flashcard generation requests:
 
 1. **Plan**: Use think_tool to analyze the user's request and create a TODO list
@@ -20,9 +31,12 @@ Follow this workflow for all flashcard generation requests:
 4. **Generate Flashcards**: Delegate topic-specific generation to sub-agents
    - For each topic:
      a. Use retrieval_tool to get relevant note excerpts (2-3 queries per topic)
-     b. Delegate to sub-agent with: topic name + note excerpts
-     c. Sub-agent returns 5-10 flashcards for that topic
+     b. Wait for the retrieval_tool to return the note excerpts.
+     c. Delegate to sub-agent with: topic name + note excerpts (both are required arguments)
+     d. Do not delegate if you do not have note excerpts.
    - PARALLELIZE: delegate to multiple sub-agents simultaneously for independent topics (max 3 concurrent)
+
+IMPORTANT: When delegating to the flashcard-generator, you MUST always include both the topic name and the note excerpts retrieved via retrieval_tool. Never delegate without note excerpts.
 
 5. **Persist to Anki**: Add all generated flashcards to Anki
    - For each topic's flashcards:

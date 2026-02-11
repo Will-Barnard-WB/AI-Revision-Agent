@@ -1,3 +1,5 @@
+import subprocess
+import shlex
 from langchain_core.tools import tool
 from RAG import retriever
 from dotenv import load_dotenv
