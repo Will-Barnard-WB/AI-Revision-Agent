@@ -1,9 +1,14 @@
 import subprocess
 import shlex
 from langchain_core.tools import tool
-from RAG import retriever
+from RAG import get_retriever, persist_directory, collection_name
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 from typing import List, Dict
+from pathlib import Path
 import os
 import requests
 
@@ -15,6 +20,7 @@ def retrieval_tool(query: str) -> str:
     This tool searches and returns the information from the Linear Algebra Notes document.
     '''
 
+    retriever = get_retriever()
     docs = retriever.invoke(query)
 
     if not docs:
@@ -28,17 +34,112 @@ def retrieval_tool(query: str) -> str:
 
 
 @tool
-def thinking_tool(tasks: str, reasoning : str, tool_calls: list ) -> dict:
+def think_tool(reflection: str) -> str:
     """
-    This tool is used for the agent's internal reasoning and planning. It should return a structured To-Do list and the next tool calls.
-    The agent must call this tool before any other tool to plan its actions.
-    The output should include:
-1. A numbered To-Do list of all steps the agent plans to take,
-2. A clear explanation of the agent's thought process and reasoning behind the plan.
-3. A list of the next tool calls to execute, with their parameters, in the exact order they should be called.
-    The agent should use this tool iteratively after each tool execution to update its plan and ensure it is on track to complete the task efficiently and correctly.
+    Tool for critical reflection and deliberate decision-making.
+    
+    Use this tool SPARINGLY for critical decision points only - NOT for routine planning or before every tool call.
+    
+    WHEN TO USE THIS TOOL (Critical Decisions Only):
+    1. "Do I have enough context to delegate to a subagent, or do I need more information?"
+    2. "Should I parallelize subagent delegations or execute sequentially?"
+    3. "Has the situation changed mid-execution? Should I adjust my approach?"
+    4. "Are the retrieved results sufficient, or do I need alternative queries?"
+    
+    WHEN NOT TO USE THIS TOOL:
+    - Before every tool call (use write_todos instead for multi-step tasks)
+    - To create TODO lists (use write_todos tool for task management)
+    - For routine decisions or straightforward execution
+    - Multiple times per task iteration
+    
+    HOW TO USE:
+    think_tool(
+      reflection="Decision: Do I have enough eigenvalue content to delegate to flashcard agent?
+                  Analysis: Retrieved 5 chunks covering definition, properties, and examples.
+                  Conclusion: Sufficient. Will delegate to anki-flashcard with full context."
+    )
+    
+    This tool creates a deliberate pause for thoughtful reasoning. Keep reflections brief and focused.
     """
-    return (tasks, reasoning, tool_calls)
+    return f"Reflection recorded: {reflection}"
+
+
+@tool
+def ingest_documents_tool(pdf_file_path: str) -> str:
+    """
+    Ingest new PDF documents into the shared Chroma vector database.
+    
+    This tool:
+    1. Loads a PDF file from the provided path
+    2. Splits it into chunks (1000 chars with 200 char overlap)
+    3. Generates OpenAI embeddings
+    4. Stores in the existing Chroma database (persists across sessions)
+    5. Returns success/failure status with document count
+    
+    Args:
+        pdf_file_path: Absolute path to the PDF file to ingest
+        
+    Returns:
+        Success message with document count, or error message if ingestion fails
+        
+    IMPORTANT:
+    - Uses the same vectorDB as retrieval_tool (persist_directory + collection_name)
+    - Call this ONCE per unique PDF to avoid duplicates
+    - After ingestion, retrieval_tool will immediately find documents from new PDF
+    """
+    try:
+        # Validate file exists
+        pdf_path = Path(pdf_file_path)
+        if not pdf_path.exists():
+            return f"❌ ERROR: PDF file not found at {pdf_file_path}"
+        
+        if not pdf_path.suffix.lower() == '.pdf':
+            return f"❌ ERROR: File is not a PDF. Expected .pdf, got {pdf_path.suffix}"
+        
+        # Load PDF
+        print(f"📖 Loading PDF: {pdf_path.name}...")
+        pdf_loader = PyPDFLoader(str(pdf_path))
+        pages = pdf_loader.load()
+        
+        if not pages:
+            return f"❌ ERROR: No content extracted from PDF {pdf_file_path}"
+        
+        # Split into chunks
+        print(f"✂️  Splitting into chunks...")
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", ".", " ", ""]
+        )
+        pages_split = text_splitter.split_documents(pages)
+        
+        # Generate embeddings and store in existing Chroma database
+        print(f"🔄 Generating embeddings and storing in vector database...")
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        
+        # Add to existing collection (or create if doesn't exist)
+        vectorstore = Chroma.from_documents(
+            documents=pages_split,
+            embedding=embeddings,
+            persist_directory=persist_directory,
+            collection_name=collection_name
+        )
+        
+        return (
+            f"✅ Successfully ingested '{pdf_path.name}'\n"
+            f"   📄 Documents ingested: {len(pages_split)}\n"
+            f"   📂 Vector DB: {collection_name}\n"
+            f"   💾 Persisted to: {persist_directory}\n"
+            f"   🔍 Ready for retrieval_tool queries"
+        )
+    
+    except ImportError as e:
+        return f"❌ ERROR: Missing required library. {str(e)}"
+    except Exception as e:
+        return f"❌ ERROR: Failed to ingest documents. {str(e)}"
+
+
+
 
 @tool
 def add_anki_notes(topic: str,qa_pairs: List[Dict[str, str]], parent_deck: str = "Linear Algebra", model_name: str = "Basic") -> str:

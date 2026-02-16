@@ -16,3 +16,16 @@
 
 
 8. forgiving tool calls / return error let agent learn and then saves its learning to an .md file?
+
+
+
+
+
+
+10. ADD SKILLS AND GIVE TO THE SUBAGENTS!
+11. handling duplicate flashcards / embedded lecture text / existing lecture materials (use update?). ALREADY SEEMS TO BE DOING THAT AS WRITE FILE DIDNT WORK (EXISTS ERROR) -> THEN GLOB, READ FILE, AND EDIT FILE, ALTHOUGH IT DID THEN CALL WRITE FILE AGAIN AFTER THIS BUT THEN REALISE IT NEEDS A NEW FILE NAME  - MIGHT NEED ITS PROMPT ADJUSTING A LIL BIT MAYBE -> SEE 019c6621-e2a9-70f3-8df7-eeab3415acab
+
+fancy UI
+storing its findings to its own learning file.
+
+tool limits / rates and traceablity and evals
