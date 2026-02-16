@@ -1,31 +1,30 @@
 
-1. Checking for existing (semantically similar/identical) flashcards before adding to the deck.
-2. Creating the agent loop with conversation history (what to add to memory) and modifying /exploring the existing state from the agent object.
-3. "I noticed the agent searched 7 times for "Sylvester's Theorem." This often happens if the retrieval_tool returns a result that the LLM thinks is "incomplete."
+THIS WEEK
 
-    Tip: If your PDF chunks are small, the LLM might be trying to piece the theorem together.
+1. How does the agent handle duplicate / existing tasks? handling duplicate flashcards / embedded lecture text / existing lecture materials (use update?). ALREADY SEEMS TO BE DOING THAT AS WRITE FILE DIDNT WORK (EXISTS ERROR) -> THEN GLOB, READ FILE, AND EDIT FILE, ALTHOUGH IT DID THEN CALL WRITE FILE AGAIN AFTER THIS BUT THEN REALISE IT NEEDS A NEW FILE NAME  - MIGHT NEED ITS PROMPT ADJUSTING A LIL BIT MAYBE -> SEE 019c6621-e2a9-70f3-8df7-eeab3415acab
+7. Check different lecture notes, and tavily tool for not in lecture notes!
 
-    Next Step: You might want to add a "Max Iterations" check or a more descriptive instruction telling the LLM: "If you find a definition and a proof, stop searching and generate the cards."
+TESTING CAN IT HANDLE A WIDE RANGE OF TASKS - ASK CHAT ARE PROMPTS TOO SPECIFIC IS IT ADAPTABLE 
 
-4. Rewrite MCP server to contain more user-focused tasks that can be completed??
+Custom skills for e.g. markdown file structure 
+3. Storing its learnings to its own files and loading into context 
 
-4. Field values of evaluators? 
-5. Max depth / iterations or ways for LLMs to stop when stuck.
+NEXT WEEK
 
-7. Flashcards already exist (use view existing tool to not add duplicates see if it can find anything else that's not in there from RAG) (for all agents)?
-
-
-8. forgiving tool calls / return error let agent learn and then saves its learning to an .md file?
-
-
+SAYS ITS UPLOADED 15 CARDS WHEN ITS ONLY 10 - could get some good testing/evaluation data from this!
+ 
+4. UI / CLI 
+5. Tool call limits / rates (middleware)
+6. Traceability and evals
 
 
 
 
-10. ADD SKILLS AND GIVE TO THE SUBAGENTS!
-11. handling duplicate flashcards / embedded lecture text / existing lecture materials (use update?). ALREADY SEEMS TO BE DOING THAT AS WRITE FILE DIDNT WORK (EXISTS ERROR) -> THEN GLOB, READ FILE, AND EDIT FILE, ALTHOUGH IT DID THEN CALL WRITE FILE AGAIN AFTER THIS BUT THEN REALISE IT NEEDS A NEW FILE NAME  - MIGHT NEED ITS PROMPT ADJUSTING A LIL BIT MAYBE -> SEE 019c6621-e2a9-70f3-8df7-eeab3415acab
 
-fancy UI
-storing its findings to its own learning file.
 
-tool limits / rates and traceablity and evals
+
+
+
+
+
+

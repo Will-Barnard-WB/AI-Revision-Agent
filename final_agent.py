@@ -661,7 +661,7 @@ async def main():
             "messages": [
                 {
                     "role": "user",
-                    "content": "Look through my linear algebra revision notes, generate me some flaschards on eigenvalues and then a practice exam please and a study guide!.",
+                    "content": "Look through my linear algebra revision notes, generate me some flashcards on symmetric bilinear forms and then a practice exam please and a study guide!.",
                 }
             ],
         },
