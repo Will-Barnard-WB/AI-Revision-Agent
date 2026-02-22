@@ -12,7 +12,91 @@ from pathlib import Path
 import os
 import requests
 
+import httpx
+from langchain_core.tools import InjectedToolArg, tool
+from markdownify import markdownify
+from tavily import TavilyClient
+from typing_extensions import Annotated, Literal
+
 load_dotenv()
+
+tavily_client = TavilyClient()
+
+
+def fetch_webpage_content(url: str, timeout: float = 10.0) -> str:
+    """Fetch and convert webpage content to markdown.
+
+    Args:
+        url: URL to fetch
+        timeout: Request timeout in seconds
+
+    Returns:
+        Webpage content as markdown
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    try:
+        response = httpx.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        return markdownify(response.text)
+    except Exception as e:
+        return f"Error fetching content from {url}: {str(e)}"
+
+
+@tool(parse_docstring=True)
+def tavily_search(
+    query: str,
+    max_results: Annotated[int, InjectedToolArg] = 1,
+    topic: Annotated[
+        Literal["general", "news", "finance"], InjectedToolArg
+    ] = "general",
+) -> str:
+    """Search the web for information on a given query.
+
+    Uses Tavily to discover relevant URLs, then fetches and returns full webpage content as markdown.
+
+    Args:
+        query: Search query to execute
+        max_results: Maximum number of results to return (default: 1)
+        topic: Topic filter - 'general', 'news', or 'finance' (default: 'general')
+
+    Returns:
+        Formatted search results with full webpage content
+    """
+    # Use Tavily to discover URLs
+    search_results = tavily_client.search(
+        query,
+        max_results=max_results,
+        topic=topic,
+    )
+
+    # Fetch full content for each URL
+    result_texts = []
+    for result in search_results.get("results", []):
+        url = result["url"]
+        title = result["title"]
+
+        # Fetch webpage content
+        content = fetch_webpage_content(url)
+
+        result_text = f"""## {title}
+**URL:** {url}
+
+{content}
+
+---
+"""
+        result_texts.append(result_text)
+
+    # Format final response
+    response = f"""🔍 Found {len(result_texts)} result(s) for '{query}':
+
+{chr(10).join(result_texts)}"""
+
+    return response
+
 
 @tool
 def retrieval_tool(query: str) -> str:
@@ -138,56 +222,6 @@ def ingest_documents_tool(pdf_file_path: str) -> str:
     except Exception as e:
         return f"❌ ERROR: Failed to ingest documents. {str(e)}"
 
-
-
-
-@tool
-def add_anki_notes(topic: str,qa_pairs: List[Dict[str, str]], parent_deck: str = "Linear Algebra", model_name: str = "Basic") -> str:
-    '''
-    Add Q/A pairs as Anki notes under a topic subdeck.
-    '''
-    
-    if not qa_pairs:
-        return "No Q/A pairs provided. Nothing was added."
-
-    deck_name = f"{parent_deck}::{topic}"
-
-    try:
-        requests.post(
-            os.getenv("ANKI_CONNECT_URL", "http://localhost:8765"),
-            json={"action": "createDeck", "version": 5, "params": {"deck": deck_name}},
-            timeout=10
-        )
-    except requests.exceptions.RequestException as e:
-        return f"Failed to create deck {deck_name}: {e}"
-
-    anki_notes = []
-    for qa in qa_pairs:
-        if "front" not in qa or "back" not in qa:
-            return "Invalid Q/A pair format. Each must have 'front' and 'back'."
-        anki_notes.append({
-            "deckName": deck_name,
-            "modelName": model_name,
-            "fields": {"Front": qa["front"], "Back": qa["back"]},
-            "tags": ["auto_generated", "rag"]
-        })
-
-    try:
-        response = requests.post(
-            os.getenv("ANKI_CONNECT_URL", "http://localhost:8765"),
-            json={"action": "addNotes", "version": 5, "params": {"notes": anki_notes}},
-            timeout=10
-        )
-        response.raise_for_status()
-        result = response.json()
-    except requests.exceptions.RequestException as e:
-        return f"Failed to connect to AnkiConnect: {e}"
-
-    if result.get("error") is not None:
-        return f"AnkiConnect error: {result['error']}"
-
-    added_count = len([r for r in result.get("result", []) if r is not None])
-    return f"Successfully added {added_count} flashcards to '{deck_name}'."
 
 
 

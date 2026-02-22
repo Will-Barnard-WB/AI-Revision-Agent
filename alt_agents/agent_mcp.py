@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from utils import show_prompt, format_messages
 from IPython.display import Image, display
 
-from prompts import mcp_prompt
+from alt_agents.alt_prompts import mcp_prompt
 from model import llm
 from tools import retrieval_tool, thinking_tool
 

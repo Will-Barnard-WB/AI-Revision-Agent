@@ -26,7 +26,8 @@ By the end, you should be able to:
 - **Topic to learn**: Rank and radical of symmetric bilinear forms, and Sylvester’s Theorem.
 - **Practice**: Calculate the rank and radical for given symmetric bilinear forms.
 
-## Key Concepts & Definitions
+## Key Concepts
+
 - **Symmetric Bilinear Form**: A function B: V × V → F such that B(v, w) = B(w, v) for all v, w in V.
 
 - **Diagonalisation Theorem**: For a symmetric bilinear form B on a finite-dimensional vector space over a field F, there exists a basis v1,...,vn such that B(vi, vj) = 0 for all i ≠ j.
@@ -37,8 +38,8 @@ By the end, you should be able to:
 
 - **Sylvester’s Theorem**: Any symmetric bilinear form can be represented by a diagonal matrix in an appropriate basis.
 
-## Key Formulas & Theorems
-- **Example of Symmetric Bilinear Form**: If B(v, w) = v^T A w for a symmetric matrix A, then B is a symmetric bilinear form.
+## Important Theorems
+- **Applications**: Symmetric bilinear forms are used in various applications, including quadratic forms and optimization problems.
 
 ## Common Mistakes & Corrections
 - **Mistake 1**: Confusing symmetric bilinear forms with general bilinear forms. 

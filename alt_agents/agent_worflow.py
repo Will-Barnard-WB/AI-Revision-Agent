@@ -7,7 +7,7 @@ from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 
-from prompts import standard_prompt
+from alt_agents.alt_prompts import standard_prompt
 
 from tools import retrieval_tool, add_anki_notes
 

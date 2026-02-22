@@ -43,6 +43,8 @@ flashcard generation, and revision material creation.
 
 ### Step 1: Create TODO List
 Start by calling write_todos with all planned tasks marked "pending" and first task "in_progress":
+
+### Example todo list:
 ```
 write_todos([
   {"content": "Retrieve [topic] content from RAG", "status": "in_progress"},
@@ -100,6 +102,7 @@ write_todos([
 For each additional task (exams, study guides), delegate with the SAME retrieved content and update todos after each.
 
 ### Step 7: Final Report
+example: 
 ```
 write_todos([
   {"content": "Retrieve [topic] content from RAG", "status": "completed"},
@@ -108,7 +111,10 @@ write_todos([
   {"content": "Report results to user", "status": "in_progress"}
 ])
 ```
-Report all results to user, then mark final todo completed.
+### Step 7: Final Report
+Read ALL tool outputs and subagent responses from this conversation, then report 
+faithfully to the user what actually happened — not what you expected to happen.
+Your final message must be grounded in the actual outputs you received, not assumptions.
 
 ## Key Rules
 
@@ -244,134 +250,37 @@ anki_flashcard_sub_agent_prompt = """
 # Anki Flashcard Generation Specialist
 
 You are an expert in creating high-quality flashcards optimized for spaced repetition learning.
-Your role is to synthesize provided lecture content into focused, atomic flashcards that maximize 
-learning efficiency and long-term retention.
 
-## Available Tools
+## WORKFLOW
 
-1. **add_anki_notes(topic, qa_pairs, parent_deck, model_name)**: Add flashcards to Anki
-   - Creates hierarchical decks (e.g., "Linear Algebra::Eigenvalues")
-   - Expects list of {front, back} pairs
-   - Returns count of successfully added cards
+1. Call list_decks() — if the topic deck doesn't exist, call create_deck()
+2. Call list_cards() — get all existing cards from the deck
+3. Write a GAP ANALYSIS before generating anything:
 
-2. **list_decks()**: View all existing Anki decks
-   - Use to check for existing topic decks
-   - Verify deck structure
-   - Plan new deck creation
+   ALREADY COVERED:
+   - [concept] ← because card "[existing front]" covers this
+   - [concept] ← because card "[existing front]" covers this
 
-3. **create_deck(name)**: Create new Anki deck
-   - Use hierarchical names: "Parent::Child::Topic"
-   - Safe to call multiple times (creates only if doesn't exist)
+   NOT YET COVERED:
+   - [concept] — not found in any existing card
+   - [concept] — not found in any existing card
 
-4. **list_cards(deck_name)**: Count cards in a deck
-   - Verify successful card addition
-   - Check for duplicates
+   If everything is already covered, stop here and tell the user.
 
+4. Generate 10-15 flashcards covering ONLY concepts in your NOT YET COVERED list
+5. Call add_card() for each one, one at a time
+6. Report results
 
-## Flashcard Generation Pattern: Plan → Generate → Verify → Persist
+## add_card() return values
+- {"success": true}  →  report "✓ Added: [question]"
+- {"success": false, "skipped": true}  →  report "~ Skipped (duplicate): [question]"
+- {"success": false, "error": ...}  →  report "✗ Failed: [question] — [error]"
 
-### Phase 1: Plan Quality Approach
-ALWAYS think first to create a quality plan:
-- Card distribution: X definitions, Y properties, Z examples
-- Atomic focus: One concept per card
-- Difficulty progression: Basics → Advanced
-- Coverage areas and potential gaps
-
-### Phase 2: Generate Flashcards
-Create flashcard pairs based on provided content
-
-**Card Structure:**
-{
-"front": "[Clear, specific question]",
-"back": "[Concise 2-4 sentence answer]"
-}
-**Example Good Card:**
-Front: "What is the geometric interpretation of an eigenvector?"
-Back: "An eigenvector is a non-zero vector that only changes by a scalar factor
-when a linear transformation is applied. The scaling factor is the corresponding
-eigenvalue, meaning Av = λv for eigenvector v and eigenvalue λ."
-
-
-### Phase 3: Quality Verification
-After generation, call think_tool to verify:
-- Atomicity: Each card covers one concept
-- Clarity: Front questions are unambiguous
-- Conciseness: Back answers are 2-4 sentences
-- Context: Cards stand alone without dependencies
-- Coverage: Balanced mix of definition/property/example
-
-### Phase 4: Persist to Anki
-Add cards to Anki with proper deck structure:
-1. Check existing decks with list_decks()
-2. Create topic subdeck: "Linear Algebra::TopicName"
-3. Call add_anki_notes() with topic, qa_pairs, parent_deck, model_name
-4. Verify count with list_cards()
-5. Report completion with exact card count
-
-## Flashcard Quality Standards
-
-### ATOMIC PRINCIPLE (One Concept Per Card)
-✓ "What is the Jordan Normal Form?"
-✗ "Explain Jordan Normal Form, eigenvalues, and applications"
-
-### CLARITY PRINCIPLE (Clear, Unambiguous Front)
-✓ "For a matrix A with eigenvalue λ = 2, what does the eigenvector represent?"
-✗ "What about this?" (too vague)
-
-### CONCISENESS PRINCIPLE (2-4 Sentence Back)
-Keep answers focused and scannable for review
-
-### CONTEXT PRINCIPLE (Standalone Cards)
-Each card must be understandable without reading others
-
-### COVERAGE PRINCIPLE (Balanced Mix)
-For each topic, aim for:
-- 30% Definitions and fundamental concepts
-- 40% Properties, theorems, and relationships
-- 20% Examples and applications
-- 10% Common pitfalls and edge cases
-
-## Hard Limits & Constraints
-
-### Card Count Limits
-- Minimum: 5 cards per topic
-- Target: 10-15 cards per topic
-- Maximum: 20 cards per topic
-- If user requests >20: Split into multiple subtopics
-
-### Deck Management
-- Always create hierarchical subdecks: "ParentDeck::TopicName"
-- Prevent duplicates by checking list_cards() before adding
-- Use consistent naming across all decks
-- Never delete or modify existing decks (only create)
-
-### Content Constraints
-- Use ONLY provided lecture excerpts as primary source
-- Do NOT generate from general knowledge
-- If content insufficient: Report gap and ask for more
-- Mark any supplementary web sources clearly
-
-### Dependency Constraints
-- MANDATORY: Topic name + lecture excerpts (both required)
-- Do NOT accept delegation without excerpts
-- If excerpts missing: Respond "ERROR: Lecture excerpts required"
-
-## Preventing Duplicate Cards
-
-Before adding cards to a deck:
-1. Call list_cards(deck_name) to see existing cards
-2. Check front sides of provided cards against existing
-3. If 80%+ overlap with existing: Skip or reformulate
-4. Report any skipped cards due to duplicates
-5. Final count reflects unique cards added
-
-## Error Handling
-
-- If topic name missing: "ERROR: Topic name required"
-- If excerpts missing: "ERROR: Lecture excerpts required"
-- If no relevant content: Report specific gaps, ask for additional material
-- If deck creation fails: Report error and ask about Anki connection
-- If card addition fails: Report which cards failed and why
+## Flashcard Quality
+- ATOMIC: One concept per card
+- CLEAR: Specific, unambiguous questions
+- CONCISE: 2-4 sentence answers
+- Mix: 30% definitions, 40% properties, 20% examples, 10% pitfalls
 """
 
 file_handling_sub_agent_prompt = """
@@ -661,7 +570,7 @@ async def main():
             "messages": [
                 {
                     "role": "user",
-                    "content": "Look through my linear algebra revision notes, generate me some flashcards on symmetric bilinear forms and then a practice exam please and a study guide!.",
+                    "content": "Look through my linear algebra revision notes, generate me some flaschards on symmetric bilinear forms.",
                 }
             ],
         },

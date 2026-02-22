@@ -53,13 +53,13 @@ async def list_cards(deck_name: str) -> List[dict]:
 
 @mcp.tool(description="Add a flashcard to an EXISTING Anki deck. Returns structured success/error.")
 async def add_card(deck: str, front: str, back: str) -> Dict:
-    """Add a note to a deck; return error if deck doesn't exist."""
+    """Add a note to a deck; return error if deck doesn't exist or card is a duplicate."""
     params = {
         "note": {
             "deckName": deck,
             "modelName": "Basic",
             "fields": {"Front": front, "Back": back},
-            "options": {"allowDuplicate": True},
+            "options": {"allowDuplicate": False},
             "tags": [],
         }
     }
@@ -67,7 +67,10 @@ async def add_card(deck: str, front: str, back: str) -> Dict:
         note_id = await anki_req("addNote", params)
         return {"success": True, "note_id": note_id}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower():
+            return {"success": False, "skipped": True, "reason": "duplicate"}
+        return {"success": False, "error": error_msg}
 
 if __name__ == "__main__":
     

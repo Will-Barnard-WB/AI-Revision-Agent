@@ -1,4 +1,4 @@
-"""Utility functions for displaying messages and prompts in Jupyter notebooks."""
+"""Utility functions for displaying messages and prompts."""
 
 import json
 

@@ -3,7 +3,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
 from tools import retrieval_tool, add_anki_notes
-from prompts import standard_prompt
+from alt_agents.alt_prompts import standard_prompt
 
 load_dotenv()
 
