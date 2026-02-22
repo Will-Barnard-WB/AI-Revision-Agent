@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RevisionAgent</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside class="sidebar w-56 flex-shrink-0 flex flex-col py-6 px-3 fixed h-full z-10">
+        <div class="mb-8 px-3">
+            <h1 class="text-xl font-bold text-indigo-400">📚 RevisionAgent</h1>
+            <p class="text-xs text-slate-500 mt-1">Ambient AI Revision</p>
+        </div>
+
+        <nav class="flex flex-col gap-1 flex-1">
+            <a href="/chat"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                      {% if active == 'chat' %}active{% else %}text-slate-400{% endif %}">
+                💬 <span>Chat</span>
+            </a>
+            <a href="/ambient"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                      {% if active == 'ambient' %}active{% else %}text-slate-400{% endif %}">
+                🔄 <span>Ambient</span>
+            </a>
+            <a href="/approvals"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                      {% if active == 'approvals' %}active{% else %}text-slate-400{% endif %}">
+                ⚠️ <span>Approvals</span>
+                <span id="sidebar-approval-count"
+                      class="approval-badge ml-auto"
+                      style="display:none"
+                      hx-get="/tasks/pending/count" hx-trigger="load, every 5s" hx-swap="innerHTML"
+                      >0</span>
+            </a>
+            <a href="/history"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                      {% if active == 'history' %}active{% else %}text-slate-400{% endif %}">
+                📋 <span>History</span>
+            </a>
+        </nav>
+
+        <div class="px-3 mt-auto">
+            <div class="card text-xs" id="ambient-badge"
+                 hx-get="/ambient/status" hx-trigger="load, every 30s"
+                 hx-swap="innerHTML">
+                Loading…
+            </div>
+        </div>
+
+        <script>
+        document.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'ambient-badge') {
+                try {
+                    const d = JSON.parse(evt.detail.target.innerText);
+                    const dot = d.running
+                        ? '<span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1.5" style="animation:pulse 2s infinite"></span>'
+                        : '<span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1.5"></span>';
+                    const src = d.source ? ` <span class="text-slate-600">(${d.source})</span>` : '';
+                    evt.detail.target.innerHTML = `<div class="flex items-center">${dot}<span>${d.running ? 'Cron active' : 'Cron stopped'}${src}</span></div>`;
+                } catch(e) {}
+            }
+            if (evt.detail.target.id === 'sidebar-approval-count') {
+                try {
+                    const d = JSON.parse(evt.detail.target.innerText);
+                    const badge = evt.detail.target;
+                    badge.textContent = d.count;
+                    badge.style.display = d.count > 0 ? 'inline-flex' : 'none';
+                } catch(e) {}
+            }
+        });
+        </script>
+    </aside>
+
+    <!-- Main content -->
+    <main class="ml-56 flex-1 min-h-screen">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

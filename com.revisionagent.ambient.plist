@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Unique identifier for this agent -->
+    <key>Label</key>
+    <string>com.revisionagent.ambient</string>
+
+    <!-- Command to run: python3.11 ambient.py as a long-running daemon -->
+    <!-- -u = unbuffered so logs appear immediately -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3.11</string>
+        <string>-u</string>
+        <string>/Users/willbarnard/Documents/RevisionAgent/ambient.py</string>
+    </array>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/willbarnard/Documents/RevisionAgent</string>
+
+    <!-- Start automatically on login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart if it crashes -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Throttle restarts (don't restart more often than every 30s) -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/Users/willbarnard/Documents/RevisionAgent/AgentOutput/.ambient_stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/willbarnard/Documents/RevisionAgent/AgentOutput/.ambient_stderr.log</string>
+
+    <!-- Environment variables — API keys loaded from .env by ambient.py -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

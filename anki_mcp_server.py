@@ -18,12 +18,12 @@ async def anki_req(action: str, params: dict = None):
             raise RuntimeError(body["error"])
         return body["result"]
 
-@mcp.tool( description="List all available Anki deck names, including hierarchical decks in 'Parent::Child' format.")
+@mcp.tool(description="List all available Anki deck names, including hierarchical decks in 'Parent::Child' format. Call this FIRST before creating cards to check if a deck already exists and to discover the naming convention.")
 async def list_decks() -> List[str]:
     """Return a list of all decks."""
     return await anki_req("deckNames")
 
-@mcp.tool(description="Create a new Anki deck with the given name. Supports hierarchical structure using '::'. Returns structured result.")
+@mcp.tool(description="Create a new Anki deck. Supports hierarchical naming with '::' (e.g. 'Linear Algebra::Eigenvalues'). Always call list_decks() first to avoid creating duplicates. Returns {success: true/false}.")
 async def create_deck(name: str) -> dict:
     """Create a deck; return structured error if it already exists."""
     try:
@@ -32,7 +32,7 @@ async def create_deck(name: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@mcp.tool(description="List all flashcards in an existing deck. Returns the front, back, and note ID for each card.")
+@mcp.tool(description="List all flashcards in an existing deck. Returns front, back, and noteId for each card. Use this for GAP ANALYSIS before generating new cards — compare existing cards against your planned content to avoid duplicates.")
 async def list_cards(deck_name: str) -> List[dict]:
     """Return all cards in a deck."""
     # Use the correct AnkiConnect query format: deck:"Deck Name"
@@ -51,7 +51,7 @@ async def list_cards(deck_name: str) -> List[dict]:
         })
     return results
 
-@mcp.tool(description="Add a flashcard to an EXISTING Anki deck. Returns structured success/error.")
+@mcp.tool(description="Add a single flashcard to an EXISTING deck. The deck must already exist (call create_deck first). Automatically rejects exact duplicates. Returns {success: true, note_id} on success, {success: false, skipped: true} for duplicates, or {success: false, error} on failure. Call one at a time for each card.")
 async def add_card(deck: str, front: str, back: str) -> Dict:
     """Add a note to a deck; return error if deck doesn't exist or card is a duplicate."""
     params = {

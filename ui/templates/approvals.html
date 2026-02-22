@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% set active = "approvals" %}
+
+{% block content %}
+<div class="p-6 max-w-5xl">
+    <header class="mb-6">
+        <h2 class="text-lg font-semibold">⚠️ Pending Approvals</h2>
+        <p class="text-sm text-slate-500">
+            Tasks waiting for your review — approve or reject file writes before the agent continues
+        </p>
+    </header>
+
+    <!-- Pending approvals list (auto-refreshes) -->
+    <div id="approvals-list"
+         hx-get="/tasks/pending"
+         hx-trigger="load, every 5s"
+         hx-swap="innerHTML">
+        Loading…
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id !== 'approvals-list') return;
+
+    try {
+        const tasks = JSON.parse(evt.detail.target.innerText);
+
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+            evt.detail.target.innerHTML = `
+                <div class="card text-center py-12">
+                    <div class="text-4xl mb-3">✅</div>
+                    <h3 class="text-lg font-medium text-slate-300 mb-1">All clear</h3>
+                    <p class="text-sm text-slate-500">No tasks need your approval right now.</p>
+                </div>`;
+            updateBadgeCount(0);
+            return;
+        }
+
+        updateBadgeCount(tasks.length);
+
+        let html = '<div class="space-y-4">';
+        tasks.forEach(t => {
+            const time = t.created_at ? new Date(t.created_at).toLocaleString() : 'Unknown';
+            const interrupt = t.interrupt_payload || {};
+            const requests = interrupt.action_requests || [];
+
+            html += `<div class="approval-card card border-l-4 border-l-amber-500" id="approval-${t.id}">`;
+
+            // ── Header row ──
+            html += `<div class="flex justify-between items-start mb-3">
+                <div class="flex-1 mr-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="badge badge-awaiting">⚠️ Awaiting approval</span>
+                        <span class="text-xs text-slate-600">ID: ${t.id}</span>
+                    </div>
+                    <p class="text-sm font-medium text-slate-200">${escapeHtml(t.message)}</p>
+                    <p class="text-xs text-slate-500 mt-1">Submitted ${time}</p>
+                </div>
+            </div>`;
+
+            // ── Action details ──
+            if (requests.length > 0) {
+                html += `<div class="mb-4 space-y-2">`;
+                requests.forEach((req, i) => {
+                    const toolName = req.name || 'unknown';
+                    const args = req.args || {};
+                    const filePath = args.file_path || '';
+                    const fileName = filePath ? filePath.split('/').pop() : '';
+
+                    html += `<div class="approval-action-detail p-3 rounded-lg">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-amber-400">📝</span>
+                            <code class="text-sm text-amber-300">${escapeHtml(toolName)}</code>
+                            ${fileName ? `<span class="text-slate-500">→</span>
+                            <code class="text-sm text-slate-300">${escapeHtml(fileName)}</code>` : ''}
+                        </div>`;
+
+                    if (filePath) {
+                        html += `<p class="text-xs text-slate-500 mb-2 font-mono">${escapeHtml(filePath)}</p>`;
+                    }
+
+                    // Show a content preview if available
+                    if (args.content) {
+                        const preview = args.content.substring(0, 500);
+                        const truncated = args.content.length > 500;
+                        html += `<details class="mt-2">
+                            <summary class="text-xs text-slate-400 cursor-pointer hover:text-slate-300 transition-colors">
+                                Preview content (${args.content.length} chars)
+                            </summary>
+                            <pre class="mt-2 p-3 bg-slate-900 rounded-lg text-xs text-slate-300 overflow-x-auto max-h-64 overflow-y-auto border border-slate-700">${escapeHtml(preview)}${truncated ? '\n…' : ''}</pre>
+                        </details>`;
+                    }
+
+                    // Show other args besides content and file_path
+                    const otherArgs = Object.entries(args).filter(([k]) => k !== 'content' && k !== 'file_path');
+                    if (otherArgs.length > 0) {
+                        html += `<div class="mt-2 flex flex-wrap gap-2">`;
+                        otherArgs.forEach(([k, v]) => {
+                            html += `<span class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">${escapeHtml(k)}: ${escapeHtml(String(v).substring(0, 80))}</span>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            } else {
+                // Fallback: show raw interrupt payload
+                html += `<div class="approval-action-detail p-3 rounded-lg mb-4">
+                    <p class="text-xs text-slate-400">Raw interrupt data:</p>
+                    <pre class="text-xs text-slate-300 mt-1 overflow-x-auto">${escapeHtml(JSON.stringify(interrupt, null, 2))}</pre>
+                </div>`;
+            }
+
+            // ── Action buttons ──
+            html += `<div class="flex items-center gap-3">
+                <button onclick="resolveApproval('${t.id}', 'approve')"
+                        class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg
+                               text-sm font-medium transition-colors flex items-center gap-2">
+                    ✓ Approve
+                </button>
+                <button onclick="resolveApproval('${t.id}', 'reject')"
+                        class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg
+                               text-sm font-medium transition-colors flex items-center gap-2">
+                    ✗ Reject
+                </button>
+                <a href="/chat?resume=${t.id}"
+                   class="ml-auto text-sm text-slate-400 hover:text-indigo-400 transition-colors flex items-center gap-1">
+                    💬 Open in Chat →
+                </a>
+            </div>`;
+
+            html += `</div>`;
+        });
+        html += '</div>';
+        evt.detail.target.innerHTML = html;
+
+    } catch(e) {
+        console.error('Failed to parse approvals:', e);
+    }
+});
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function updateBadgeCount(count) {
+    const badge = document.getElementById('approval-count-badge');
+    if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+    // Also update sidebar badge
+    const sidebarBadge = document.getElementById('sidebar-approval-count');
+    if (sidebarBadge) {
+        sidebarBadge.textContent = count;
+        sidebarBadge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+async function resolveApproval(taskId, decision) {
+    const card = document.getElementById(`approval-${taskId}`);
+    if (card) {
+        card.style.opacity = '0.5';
+        card.style.pointerEvents = 'none';
+    }
+
+    try {
+        const res = await fetch(`/tasks/${taskId}/interrupt`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({decisions: [{type: decision}]})
+        });
+
+        if (res.ok) {
+            if (card) {
+                const label = decision === 'approve' ? '✅ Approved' : '❌ Rejected';
+                card.innerHTML = `<div class="text-center py-4">
+                    <p class="text-sm font-medium text-slate-300">${label} — agent is resuming…</p>
+                </div>`;
+                card.style.opacity = '1';
+                card.classList.remove('border-l-amber-500');
+                card.classList.add(decision === 'approve' ? 'border-l-green-500' : 'border-l-red-500');
+                // Remove card after a moment
+                setTimeout(() => card.remove(), 3000);
+            }
+        } else {
+            const err = await res.json();
+            alert(`Failed: ${err.detail || 'Unknown error'}`);
+            if (card) {
+                card.style.opacity = '1';
+                card.style.pointerEvents = 'auto';
+            }
+        }
+    } catch(e) {
+        alert(`Network error: ${e.message}`);
+        if (card) {
+            card.style.opacity = '1';
+            card.style.pointerEvents = 'auto';
+        }
+    }
+}
+</script>
+{% endblock %}

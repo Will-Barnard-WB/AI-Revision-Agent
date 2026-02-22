@@ -1,0 +1,63 @@
+{"timestamp": "2026-02-22T13:28:30.083103+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:29:10.095313+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:29:43.933200+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:30:26.235326+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:30:40.499177+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:30:55.416588+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:33:26.146226+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:36:17.112438+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:38:37.737940+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:39:00.310746+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:39:47.632590+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:40:45.467460+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:50:09.440782+00:00", "event": "ambient_started", "interval_seconds": 300, "watch_dir": "/Users/willbarnard/Documents/RevisionAgent/AgentOutput"}
+{"timestamp": "2026-02-22T13:50:09.442064+00:00", "event": "poll_complete", "summary": "No new PDFs found (1 total, 1 already processed)", "total_pdfs": 1, "already_processed": 1, "new_count": 0}
+{"timestamp": "2026-02-22T13:55:09.450071+00:00", "event": "poll_complete", "summary": "No new PDFs found (1 total, 1 already processed)", "total_pdfs": 1, "already_processed": 1, "new_count": 0}
+{"timestamp": "2026-02-22T14:00:09.455083+00:00", "event": "poll_complete", "summary": "No new PDFs found (1 total, 1 already processed)", "total_pdfs": 1, "already_processed": 1, "new_count": 0}
+{"timestamp": "2026-02-22T14:05:09.464720+00:00", "event": "poll_complete", "summary": "Found 1 new PDF(s): Numerical analysis notes.pdf", "total_pdfs": 2, "already_processed": 1, "new_count": 1, "new_files": ["Numerical analysis notes.pdf"]}
+{"timestamp": "2026-02-22T14:05:16.509996+00:00", "event": "processing_started", "file": "Numerical analysis notes.pdf", "topic": "Numerical Analysis Notes", "collection": "numerical_analysis_notes"}
+{"timestamp": "2026-02-22T14:05:24.469912+00:00", "event": "ingestion_complete", "file": "Numerical analysis notes.pdf", "collection": "numerical_analysis_notes"}
+{"timestamp": "2026-02-22T14:07:00.725704+00:00", "event": "agent_complete", "file": "Numerical analysis notes.pdf", "topic": "Numerical Analysis Notes"}
+{"timestamp": "2026-02-22T14:12:00.731698+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:17:00.736577+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:22:00.744173+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:27:00.752354+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:32:00.762564+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:37:00.774371+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:42:00.782194+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:47:00.793805+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:52:00.800936+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T14:57:00.810355+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:02:00.817318+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:07:00.827532+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:12:00.836530+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:17:00.845213+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:22:00.853698+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:27:00.861391+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:32:00.869818+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:37:00.877023+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:42:00.884732+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:47:00.894056+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:52:00.901696+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T15:57:00.910572+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:02:00.917132+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:07:00.922027+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:12:00.964640+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:17:00.969235+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:22:00.971834+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:27:00.981016+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:32:00.991052+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:37:00.997790+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:42:01.025867+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:47:01.028171+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:52:01.034097+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T16:57:01.038123+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T17:02:01.042540+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T17:07:01.060011+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T18:54:59.684911+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:04:07.831360+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:27:42.735837+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:32:42.740578+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:37:42.747614+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:42:42.755316+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}
+{"timestamp": "2026-02-22T21:47:42.760643+00:00", "event": "poll_complete", "summary": "No new PDFs found (2 total, 2 already processed)", "total_pdfs": 2, "already_processed": 2, "new_count": 0}

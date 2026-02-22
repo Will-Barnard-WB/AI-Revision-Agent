@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set active = "ambient" %}
+
+{% block content %}
+<div class="p-6 max-w-5xl">
+    <header class="mb-6">
+        <h2 class="text-lg font-semibold">🔄 Ambient Dashboard</h2>
+        <p class="text-sm text-slate-500">
+            Automatically detects new PDFs in AgentOutput/ and generates flashcards + study materials
+        </p>
+    </header>
+
+    <!-- Status + Actions -->
+    <div class="flex gap-4 mb-6">
+        <div class="card flex-1">
+            <h3 class="text-sm font-medium text-slate-400 mb-2">Cron Status</h3>
+            <div id="cron-status" hx-get="/ambient/status" hx-trigger="load, every 15s" hx-swap="innerHTML">
+                Loading…
+            </div>
+        </div>
+        <div class="card flex items-center">
+            <button hx-post="/ambient/poll" hx-swap="none"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg
+                           text-sm font-medium transition-colors">
+                ⚡ Poll Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Processed Manifest -->
+    <div class="card mb-6">
+        <h3 class="text-sm font-medium text-slate-400 mb-3">📋 Processed PDFs</h3>
+        <div id="manifest" hx-get="/ambient/manifest" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            Loading…
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card">
+        <h3 class="text-sm font-medium text-slate-400 mb-3">📝 Activity Log</h3>
+        <div id="ambient-log" hx-get="/ambient/log?limit=20" hx-trigger="load, every 15s" hx-swap="innerHTML">
+            Loading…
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Format the /ambient/status JSON response
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'cron-status') {
+        try {
+            const data = JSON.parse(evt.detail.target.innerText);
+            const sourceLabel = data.source === 'launchd' ? 'System daemon'
+                : data.source === 'in-process' ? 'Server built-in' : 'Stopped';
+            evt.detail.target.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="badge ${data.running ? 'badge-running' : 'badge-pending'}">
+                        ${data.running ? '<span class="pulse-dot"></span> Running' : '⏸ Stopped'}
+                    </span>
+                    <span class="text-xs text-slate-500">${sourceLabel}</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Watching: ${data.watch_dir}</p>
+            `;
+        } catch(e) {}
+    }
+
+    if (evt.detail.target.id === 'manifest') {
+        try {
+            const data = JSON.parse(evt.detail.target.innerText);
+            const files = data.processed || [];
+            if (files.length === 0) {
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No PDFs processed yet. Drop a PDF into AgentOutput/ to get started.</p>';
+            } else {
+                let html = '<div class="flex flex-wrap gap-2">';
+                files.forEach(f => {
+                    html += `<span class="badge badge-completed">📄 ${f}</span>`;
+                });
+                html += '</div>';
+                evt.detail.target.innerHTML = html;
+            }
+        } catch(e) {}
+    }
+
+    if (evt.detail.target.id === 'ambient-log') {
+        try {
+            const entries = JSON.parse(evt.detail.target.innerText);
+            if (!Array.isArray(entries) || entries.length === 0) {
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No activity yet.</p>';
+                return;
+            }
+            const icons = {
+                'poll_complete': '🔍',
+                'ambient_started': '🚀',
+                'processing_started': '⚙️',
+                'ingestion_complete': '📥',
+                'agent_complete': '✅',
+                'agent_failed': '❌',
+                'ingestion_failed': '❌',
+                'poll_error': '⚠️',
+                'new_pdfs_detected': '📄',
+            };
+            const labels = {
+                'poll_complete': 'Scheduled check',
+                'ambient_started': 'Cron started',
+                'processing_started': 'Processing PDF',
+                'ingestion_complete': 'PDF ingested into vector DB',
+                'agent_complete': 'Flashcards & materials created',
+                'agent_failed': 'Agent error',
+                'ingestion_failed': 'Ingestion error',
+                'poll_error': 'Poll error',
+            };
+            let html = '';
+            entries.forEach(entry => {
+                const time = new Date(entry.timestamp).toLocaleString();
+                const icon = icons[entry.event] || '📋';
+                const label = labels[entry.event] || entry.event.replace(/_/g, ' ');
+                const isError = entry.event.includes('fail') || entry.event.includes('error');
+                const isSuccess = entry.event === 'agent_complete';
+                const borderCls = isError ? 'border-l-red-500' : isSuccess ? 'border-l-green-500' : 'border-l-slate-600';
+
+                let detail = '';
+                if (entry.summary) {
+                    detail = entry.summary;
+                } else {
+                    if (entry.file) detail += `📄 ${entry.file} `;
+                    if (entry.topic) detail += `— ${entry.topic} `;
+                    if (entry.error) detail += `<span class="text-red-400">${entry.error}</span> `;
+                    if (entry.collection) detail += `<span class="text-slate-500">[${entry.collection}]</span>`;
+                    if (entry.interval_seconds) detail += `Polling every ${entry.interval_seconds}s`;
+                }
+
+                html += `<div class="log-entry border-l-2 ${borderCls} pl-3 py-2 mb-1">
+                    <div class="flex items-center gap-2">
+                        <span>${icon}</span>
+                        <span class="font-medium text-sm">${label}</span>
+                        <span class="text-slate-600 text-xs ml-auto">${time}</span>
+                    </div>
+                    ${detail ? `<p class="text-xs text-slate-400 mt-0.5 ml-6">${detail}</p>` : ''}
+                </div>`;
+            });
+            evt.detail.target.innerHTML = html;
+        } catch(e) {}
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% set active = "history" %}
+
+{% block content %}
+<div class="p-6 max-w-5xl">
+    <header class="mb-6">
+        <h2 class="text-lg font-semibold">📋 Task History</h2>
+        <p class="text-sm text-slate-500">Browse past tasks and generated outputs</p>
+    </header>
+
+    <!-- Tasks list -->
+    <div class="card mb-6">
+        <h3 class="text-sm font-medium text-slate-400 mb-3">Recent Tasks</h3>
+        <div id="tasks-list" hx-get="/tasks" hx-trigger="load, every 10s" hx-swap="innerHTML">
+            Loading…
+        </div>
+    </div>
+
+    <!-- Output files -->
+    <div class="card">
+        <h3 class="text-sm font-medium text-slate-400 mb-3">📁 Generated Files</h3>
+        <div id="outputs-list" hx-get="/outputs" hx-trigger="load, every 30s" hx-swap="innerHTML">
+            Loading…
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'tasks-list') {
+        try {
+            const tasks = JSON.parse(evt.detail.target.innerText);
+            if (!Array.isArray(tasks) || tasks.length === 0) {
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No tasks yet. Go to Chat to start one.</p>';
+                return;
+            }
+            let html = '<div class="space-y-3">';
+            tasks.forEach(t => {
+                const badge = t.status === 'completed' ? 'badge-completed' :
+                              t.status === 'failed' ? 'badge-failed' :
+                              t.status === 'running' ? 'badge-running' :
+                              t.status === 'awaiting_approval' ? 'badge-awaiting' :
+                              'badge-pending';
+                const statusIcon = t.status === 'completed' ? '✅' :
+                                   t.status === 'failed' ? '❌' :
+                                   t.status === 'running' ? '🔄' :
+                                   t.status === 'awaiting_approval' ? '⚠️' : '⏳';
+                const time = t.created_at ? new Date(t.created_at).toLocaleString() : '';
+                const source = t.source === 'ambient' ? '🔄 Ambient' : '💬 User';
+
+                html += `<div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-sm font-medium text-slate-200 flex-1 mr-3">${t.message.substring(0, 120)}${t.message.length > 120 ? '…' : ''}</span>
+                        <span class="badge ${badge}">${statusIcon} ${t.status}</span>
+                    </div>
+                    <div class="flex gap-3 text-xs text-slate-500">
+                        <span>${source}</span>
+                        <span>${time}</span>
+                        <span class="text-slate-600">ID: ${t.id}</span>
+                    </div>
+                    ${t.result_summary ? `<div class="text-sm text-slate-300 mt-2 prose prose-invert prose-sm max-w-none">${typeof marked !== 'undefined' ? marked.parse(t.result_summary) : t.result_summary}</div>` : ''}
+                </div>`;
+            });
+            html += '</div>';
+            evt.detail.target.innerHTML = html;
+        } catch(e) {}
+    }
+
+    if (evt.detail.target.id === 'outputs-list') {
+        try {
+            const files = JSON.parse(evt.detail.target.innerText);
+            if (!Array.isArray(files) || files.length === 0) {
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No output files yet.</p>';
+                return;
+            }
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+            files.forEach(f => {
+                const ext = f.name.split('.').pop().toLowerCase();
+                const icon = ext === 'pdf' ? '📕' : ext === 'md' ? '📝' : '📄';
+                const size = f.size > 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${f.size} B`;
+                const modified = new Date(f.modified).toLocaleDateString();
+
+                html += `<a href="/outputs/${encodeURIComponent(f.name)}" target="_blank"
+                            class="p-3 bg-slate-800/50 rounded-lg border border-slate-700
+                                   hover:border-indigo-500/50 transition-colors group">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">${icon}</span>
+                        <div>
+                            <p class="text-sm font-medium text-slate-300 group-hover:text-indigo-400 transition-colors">${f.name}</p>
+                            <p class="text-xs text-slate-500">${size} · ${modified}</p>
+                        </div>
+                    </div>
+                </a>`;
+            });
+            html += '</div>';
+            evt.detail.target.innerHTML = html;
+        } catch(e) {}
+    }
+});
+</script>
+{% endblock %}

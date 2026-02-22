@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% set active = "chat" %}
+
+{% block content %}
+<div class="flex flex-col h-screen">
+    <!-- Header -->
+    <header class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <div>
+            <h2 class="text-lg font-semibold">💬 Chat with Agent</h2>
+            <p class="text-sm text-slate-500">Ask questions, request flashcards, study guides, or any revision task</p>
+        </div>
+        <button onclick="newChat()"
+                class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg
+                       text-sm font-medium transition-colors flex items-center gap-2">
+            ✨ New Chat
+        </button>
+    </header>
+
+    <!-- Messages -->
+    <div class="chat-messages flex-1 overflow-y-auto" id="chat-messages">
+        <div class="msg-system">Start a conversation — the agent will plan and execute your revision tasks.</div>
+    </div>
+
+    <!-- Interrupt banner (hidden by default) -->
+    <div id="interrupt-area" class="px-4 hidden"></div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+        <form id="chat-form" class="flex gap-3" onsubmit="sendMessage(event)">
+            <input type="text" id="chat-input"
+                   class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5
+                          text-sm text-slate-200 placeholder-slate-500 focus:outline-none
+                          focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                   placeholder="e.g. Generate flashcards on eigenvalues from my lecture notes…"
+                   autocomplete="off">
+            <button type="submit"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg
+                           text-sm font-medium transition-colors">
+                Send
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentTaskId = null;
+let ws = null;
+let taskCompleted = false;   // true once the current task is completed
+
+function addMessage(type, content) {
+    const messages = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `msg-${type}`;
+    if (type === 'agent') {
+        div.classList.add('prose', 'prose-invert', 'prose-sm', 'max-w-none');
+    }
+    div.innerHTML = content;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+}
+
+function addSystemMsg(text) {
+    addMessage('system', text);
+}
+
+function newChat() {
+    currentTaskId = null;
+    taskCompleted = false;
+    if (ws) { ws.close(); ws = null; }
+    const messages = document.getElementById('chat-messages');
+    messages.innerHTML = '<div class="msg-system">New conversation started. Ask away!</div>';
+    document.getElementById('chat-input').placeholder = 'e.g. Generate flashcards on eigenvalues from my lecture notes…';
+}
+
+function showInterrupt(data) {
+    const area = document.getElementById('interrupt-area');
+    const requests = data.action_requests || [];
+    let html = '<div class="interrupt-banner">';
+    html += '<p class="font-medium text-amber-400 mb-2">⚠️ Agent needs your approval</p>';
+
+    requests.forEach((req, i) => {
+        html += `<div class="text-sm mb-2">
+            <span class="text-slate-300">Tool:</span> <code class="text-amber-300">${req.name}</code><br>
+            <span class="text-slate-300">File:</span> <code class="text-slate-400">${req.args?.file_path || JSON.stringify(req.args)}</code>
+        </div>`;
+    });
+
+    html += `<div class="flex gap-2 mt-3">
+        <button onclick="resolveInterrupt('approve')"
+                class="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+            ✓ Approve
+        </button>
+        <button onclick="resolveInterrupt('reject')"
+                class="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+            ✗ Reject
+        </button>
+    </div>`;
+    html += '</div>';
+
+    area.innerHTML = html;
+    area.classList.remove('hidden');
+}
+
+async function resolveInterrupt(decision) {
+    if (!currentTaskId) return;
+    const area = document.getElementById('interrupt-area');
+
+    await fetch(`/tasks/${currentTaskId}/interrupt`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({decisions: [{type: decision}]})
+    });
+
+    area.innerHTML = '';
+    area.classList.add('hidden');
+    addSystemMsg(`You ${decision === 'approve' ? 'approved ✓' : 'rejected ✗'} the action.`);
+}
+
+function connectWebSocket(taskId) {
+    if (ws) ws.close();
+    ws = new WebSocket(`ws://${window.location.host}/ws/${taskId}`);
+
+    ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+
+        if (msg.event === 'status') {
+            const d = msg.data;
+            if (d.status === 'running') {
+                addSystemMsg('<span class="pulse-dot"></span> Agent is working…');
+            } else if (d.status === 'completed') {
+                const rendered = typeof marked !== 'undefined' ? marked.parse(d.summary || 'Task completed.') : (d.summary || 'Task completed.');
+                addMessage('agent', rendered);
+                addSystemMsg('✅ Task completed');
+                taskCompleted = true;
+                document.getElementById('chat-input').placeholder = 'Send a follow-up message, or click ✨ New Chat…';
+            } else if (d.status === 'failed') {
+                addSystemMsg(`❌ Task failed: ${d.error || 'Unknown error'}`);
+                taskCompleted = true;
+            }
+        } else if (msg.event === 'interrupt') {
+            showInterrupt(msg.data);
+        }
+    };
+}
+
+async function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage('user', message);
+    input.value = '';
+
+    // If we have a completed task, send a follow-up in the same thread
+    if (currentTaskId && taskCompleted) {
+        addSystemMsg('Sending follow-up…');
+        taskCompleted = false;
+
+        const res = await fetch(`/tasks/${currentTaskId}/message`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message})
+        });
+        const data = await res.json();
+        // WebSocket is still connected — will receive updates
+        return;
+    }
+
+    // New conversation — create a fresh task
+    addSystemMsg('Submitting task…');
+
+    const res = await fetch('/tasks', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message})
+    });
+    const data = await res.json();
+    currentTaskId = data.task_id;
+    taskCompleted = false;
+
+    connectWebSocket(currentTaskId);
+}
+</script>
+{% endblock %}

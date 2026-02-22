@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% set active = "chat" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center h-screen px-6">
+    <div class="text-center max-w-lg">
+        <h2 class="text-4xl mb-4">📚</h2>
+        <h2 class="text-2xl font-bold text-slate-200 mb-3">RevisionAgent</h2>
+        <p class="text-slate-400 mb-8">
+            Your ambient AI revision assistant. Auto-detects lecture PDFs,
+            generates flashcards, study guides, and practice exams.
+        </p>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <a href="/chat" class="card hover:border-indigo-500/50 transition-colors text-center">
+                <div class="text-2xl mb-2">💬</div>
+                <h3 class="font-medium text-sm text-slate-200">Chat</h3>
+                <p class="text-xs text-slate-500 mt-1">Ask the agent directly</p>
+            </a>
+            <a href="/ambient" class="card hover:border-indigo-500/50 transition-colors text-center">
+                <div class="text-2xl mb-2">🔄</div>
+                <h3 class="font-medium text-sm text-slate-200">Ambient</h3>
+                <p class="text-xs text-slate-500 mt-1">Auto-processing dashboard</p>
+            </a>
+            <a href="/approvals" class="card hover:border-amber-500/50 transition-colors text-center relative">
+                <div class="text-2xl mb-2">⚠️</div>
+                <h3 class="font-medium text-sm text-slate-200">Approvals</h3>
+                <p class="text-xs text-slate-500 mt-1">Review pending actions</p>
+            </a>
+            <a href="/history" class="card hover:border-indigo-500/50 transition-colors text-center">
+                <div class="text-2xl mb-2">📋</div>
+                <h3 class="font-medium text-sm text-slate-200">History</h3>
+                <p class="text-xs text-slate-500 mt-1">Past tasks & outputs</p>
+            </a>
+        </div>
+
+        <p class="text-xs text-slate-600">
+            Drop a PDF into <code class="text-slate-500">AgentOutput/</code> and the ambient cron will handle the rest.
+        </p>
+    </div>
+</div>
+{% endblock %}

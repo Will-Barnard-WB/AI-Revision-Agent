@@ -1,0 +1,47 @@
+# RevisionAgent Configuration
+# ===========================
+
+# LLM Settings
+model:
+  provider: "openai"
+  name: "gpt-4o-mini"
+  temperature: 0.0
+
+# Paths
+paths:
+  agent_output: "./AgentOutput"
+  templates: "./templates"
+  chroma_persist: "."
+
+# RAG Settings
+rag:
+  default_collection: "linear_algebra_notes"
+  embedding_model: "text-embedding-3-small"
+  chunk_size: 1000
+  chunk_overlap: 200
+  retrieval_k: 5
+
+# MCP Server
+mcp:
+  anki:
+    transport: "http"
+    url: "http://127.0.0.1:8000/mcp"
+
+# Ambient Cron Settings
+ambient:
+  enabled: true
+  poll_interval_seconds: 300  # 5 minutes
+  watch_directory: "./AgentOutput"
+  manifest_file: "./AgentOutput/.processed_manifest.md"
+  log_file: "./AgentOutput/.ambient_log.jsonl"
+
+# Web UI Server
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+# Agent Limits
+limits:
+  max_retrieval_calls: 5
+  max_web_searches: 3
+  max_files_per_session: 5
