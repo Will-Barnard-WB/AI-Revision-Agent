@@ -19,7 +19,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from multi_server_mcp_client import client as mcp_client
 from tools import (
     retrieval_tool,
-    think_tool,
     ingest_pdf_tool,
     web_search,
     list_collections_tool,
@@ -128,7 +127,6 @@ async def create_agent(
     # NOTE: FilesystemBackend auto-injects ls, read_file, write_file,
     # edit_file, glob, grep into all agents — no need to add them here.
     all_tools = [
-        think_tool,
         retrieval_tool,
         ingest_pdf_tool,
         web_search,

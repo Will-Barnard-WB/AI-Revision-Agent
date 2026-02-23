@@ -3,8 +3,8 @@
 
 # LLM Settings
 model:
-  provider: "openai"
-  name: "gpt-4o-mini"
+  provider: "anthropic"
+  name: "claude-sonnet-4-6"
   temperature: 0.0
 
 # Paths

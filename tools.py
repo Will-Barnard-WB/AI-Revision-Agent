@@ -166,36 +166,6 @@ def ingest_pdf_tool(pdf_file_path: str, collection: str | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Reflection
-# ---------------------------------------------------------------------------
-
-@tool
-def think_tool(reflection: str) -> str:
-    """Pause and reason about a critical decision before acting.
-
-    **When to use this tool**
-    - You need to decide between two competing approaches.
-    - You want to assess whether retrieved content is sufficient.
-    - The situation has changed mid-execution and you need to re-plan.
-
-    **When NOT to use this tool**
-    - Routine planning (use ``write_todos`` instead).
-    - Before every single tool call — that's over-thinking.
-
-    Parameters
-    ----------
-    reflection : str
-        Your reasoning.  Keep it brief and conclude with a clear decision.
-
-    Returns
-    -------
-    str
-        Echo of your reflection (acts as a scratchpad).
-    """
-    return f"Reflection noted: {reflection}"
-
-
-# ---------------------------------------------------------------------------
 # Web search
 # ---------------------------------------------------------------------------
 
