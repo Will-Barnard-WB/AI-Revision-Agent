@@ -115,7 +115,7 @@ async def _broadcast(task_id: str, event: str, data: dict | str):
 
 async def _run_task(task_id: str):
     """Execute the agent task in the background, streaming progress over WS."""
-    from agent_factory import create_agent
+    from agent_factory import create_agent, reset_tool_counters
 
     task = _tasks[task_id]
     task.status = "running"
@@ -132,6 +132,7 @@ async def _run_task(task_id: str):
             config = {"configurable": {"thread_id": task.thread_id}}
             _task_agents[task_id] = (agent, config)
 
+        reset_tool_counters()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": task.message}]},
             config=config,
@@ -314,7 +315,7 @@ async def send_follow_up(task_id: str, body: FollowUpMessage):
 
 async def _run_follow_up(task_id: str, message: str):
     """Run a follow-up message using the cached agent and thread."""
-    from agent_factory import create_agent
+    from agent_factory import create_agent, reset_tool_counters
 
     task = _tasks[task_id]
     await _broadcast(task_id, "status", {"status": "running"})
@@ -329,6 +330,7 @@ async def _run_follow_up(task_id: str, message: str):
             config = {"configurable": {"thread_id": task.thread_id}}
             _task_agents[task_id] = (agent, config)
 
+        reset_tool_counters()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": message}]},
             config=config,

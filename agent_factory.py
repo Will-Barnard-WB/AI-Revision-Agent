@@ -17,6 +17,7 @@ from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.memory import MemorySaver
 
 from multi_server_mcp_client import client as mcp_client
+from Tools.tool_guards import ToolCallGuard
 from tools import (
     retrieval_tool,
     ingest_pdf_tool,
@@ -27,9 +28,6 @@ from tools import (
 )
 from prompts import (
     ORCHESTRATOR_PROMPT,
-    INFO_RETRIEVAL_PROMPT,
-    FLASHCARD_PROMPT,
-    FILE_HANDLING_PROMPT,
 )
 
 # ---------------------------------------------------------------------------
@@ -48,6 +46,18 @@ _model_cfg = _cfg.get("model", {})
 
 MODEL_NAME = f"{_model_cfg.get('provider', 'openai')}:{_model_cfg.get('name', 'gpt-4o-mini')}"
 TEMPERATURE = _model_cfg.get("temperature", 0.0)
+MAX_TOKENS = _model_cfg.get("max_tokens", 16384)
+
+_TOOL_GUARD = ToolCallGuard.from_config(_cfg)
+_GUARDED_RETRIEVAL_TOOL, _GUARDED_WEB_SEARCH = _TOOL_GUARD.wrap_tools(
+    retrieval_tool,
+    web_search,
+)
+
+
+def reset_tool_counters():
+    """Reset per-message tool-call counters for a new user turn."""
+    _TOOL_GUARD.reset_for_new_turn()
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -78,6 +88,7 @@ async def create_agent(
     model = init_chat_model(
         model=model_name or MODEL_NAME,
         temperature=temperature if temperature is not None else TEMPERATURE,
+        max_tokens=MAX_TOKENS,
     )
 
     if checkpointer is None:
@@ -90,46 +101,14 @@ async def create_agent(
     memory_text = _read_memory()
     live_prompt = ORCHESTRATOR_PROMPT.replace("{agent_memory}", memory_text or "(no memory yet)")
 
-    # -- Sub-agents --------------------------------------------------------
-
-    anki_flashcard_sub_agent = {
-        "name": "anki-flashcard",
-        "description": (
-            "Specialist for Anki flashcard generation & deck management. "
-            "Provide topic name and lecture excerpts in the task description."
-        ),
-        "system_prompt": FLASHCARD_PROMPT,
-        "tools": mcp_tools,
-    }
-
-    information_retrieval_sub_agent = {
-        "name": "information-retrieval",
-        "description": (
-            "Specialist for RAG retrieval, PDF ingestion, and web research. "
-            "Provide specific queries or document paths."
-        ),
-        "system_prompt": INFO_RETRIEVAL_PROMPT,
-        "tools": [retrieval_tool, ingest_pdf_tool, web_search, list_collections_tool],
-    }
-
-    file_handling_sub_agent = {
-        "name": "file-handling",
-        "description": (
-            "Specialist for creating revision materials (study guides, "
-            "practice exams, lecture summaries). Provide topic and content."
-        ),
-        "system_prompt": FILE_HANDLING_PROMPT,
-        # Uses LangGraph's built-in file-handling tools
-    }
-
     # -- All tools available to the orchestrator ---------------------------
 
     # NOTE: FilesystemBackend auto-injects ls, read_file, write_file,
     # edit_file, glob, grep into all agents — no need to add them here.
     all_tools = [
-        retrieval_tool,
+        _GUARDED_RETRIEVAL_TOOL,
         ingest_pdf_tool,
-        web_search,
+        _GUARDED_WEB_SEARCH,
         list_collections_tool,
         update_memory,
     ] + mcp_tools
@@ -142,11 +121,6 @@ async def create_agent(
         model=model,
         tools=all_tools,
         system_prompt=live_prompt,
-        subagents=[
-            anki_flashcard_sub_agent,
-            information_retrieval_sub_agent,
-            file_handling_sub_agent,
-        ],
         backend=FilesystemBackend(root_dir=".", virtual_mode=False),
         interrupt_on=interrupt_on,
         checkpointer=checkpointer,
@@ -176,6 +150,7 @@ async def run_agent(message: str, thread_id: str | None = None, agent=None):
         agent = await create_agent()
 
     config = {"configurable": {"thread_id": thread_id or str(uuid.uuid4())}}
+    reset_tool_counters()
 
     result = await agent.ainvoke(
         {"messages": [{"role": "user", "content": message}]},

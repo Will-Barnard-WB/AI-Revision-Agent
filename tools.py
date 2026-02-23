@@ -22,7 +22,6 @@ from RAG import (
     get_retriever,
     setup_retriever,
     persist_directory,
-    default_collection,
     collection_name_from_filename,
     list_collections,
     embedding_model,
@@ -68,7 +67,11 @@ def retrieval_tool(query: str, collection: str | None = None) -> str:
       generate flashcards, or write revision material.
     - Always prefer this over web search — lecture notes are the primary source.
 
-    **Tips for good queries**
+        **Required collection selection**
+        - You must pass an explicit collection name.
+        - Call ``list_collections_tool`` first, then choose one collection.
+
+        **Tips for good queries**
     - Be specific: "definition of eigenvalue" beats "eigenvalues".
     - Try multiple angles if first results are thin (e.g. definition, then
       properties, then examples).
@@ -82,14 +85,20 @@ def retrieval_tool(query: str, collection: str | None = None) -> str:
     query : str
         Natural-language search query.
     collection : str, optional
-        ChromaDB collection to search.  Leave empty to search the default
-        collection.  Call ``list_collections_tool`` to see what's available.
+        ChromaDB collection to search. If omitted, this call is rejected.
+        Call ``list_collections_tool`` to see what's available first.
 
     Returns
     -------
     str
         Formatted document chunks, or a "no results" message.
     """
+    if not collection:
+        return (
+            "❌ No collection specified. Call ``list_collections_tool`` first, "
+            "then call retrieval_tool again with an explicit collection name."
+        )
+
     retriever = get_retriever(collection)
     docs = retriever.invoke(query)
     if not docs:

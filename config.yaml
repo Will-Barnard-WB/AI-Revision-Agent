@@ -6,6 +6,7 @@ model:
   provider: "anthropic"
   name: "claude-sonnet-4-6"
   temperature: 0.0
+  max_tokens: 16384
 
 # Paths
 paths:
@@ -15,7 +16,6 @@ paths:
 
 # RAG Settings
 rag:
-  default_collection: "linear_algebra_notes"
   embedding_model: "text-embedding-3-small"
   chunk_size: 1000
   chunk_overlap: 200
@@ -42,6 +42,6 @@ server:
 
 # Agent Limits
 limits:
-  max_retrieval_calls: 5
+  max_retrieval_calls: 3
   max_web_searches: 3
   max_files_per_session: 5

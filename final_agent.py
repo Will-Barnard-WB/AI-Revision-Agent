@@ -11,7 +11,7 @@ import uuid
 
 from langgraph.types import Command
 
-from agent_factory import create_agent
+from agent_factory import create_agent, reset_tool_counters
 from utils import format_messages
 
 
@@ -49,6 +49,7 @@ async def main(message: str | None = None):
                 continue
 
         # Run the agent
+        reset_tool_counters()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": user_msg}]},
             config=config,

@@ -33,7 +33,7 @@ _rag_cfg = _cfg.get("rag", {})
 persist_directory = os.path.abspath(
     _cfg.get("paths", {}).get("chroma_persist", os.path.dirname(__file__))
 )
-default_collection = _rag_cfg.get("default_collection", "lecture_notes")
+default_collection = _rag_cfg.get("default_collection")
 embedding_model = _rag_cfg.get("embedding_model", "text-embedding-3-small")
 chunk_size = _rag_cfg.get("chunk_size", 1000)
 chunk_overlap = _rag_cfg.get("chunk_overlap", 200)
@@ -86,14 +86,15 @@ def get_retriever(coll_name: str | None = None):
     Parameters
     ----------
     coll_name : str, optional
-        The ChromaDB collection to query. Falls back to
-        ``config.yaml -> rag.default_collection`` (or ``"lecture_notes"``).
+        The ChromaDB collection to query. Must be provided explicitly.
 
     Returns
     -------
     A LangChain retriever backed by the specified Chroma collection.
     """
-    coll = coll_name or default_collection
+    coll = coll_name
+    if not coll:
+        raise ValueError("Collection name is required for get_retriever().")
     if coll not in _retrievers:
         embeddings = OpenAIEmbeddings(model=embedding_model)
         vectorstore = Chroma(

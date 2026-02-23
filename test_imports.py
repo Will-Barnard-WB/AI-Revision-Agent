@@ -23,7 +23,8 @@ import yaml
 def check_config():
     with open("config.yaml") as f:
         cfg = yaml.safe_load(f)
-    assert cfg["rag"]["default_collection"] == "linear_algebra_notes"
+    assert "default_collection" not in cfg.get("rag", {})
+    assert cfg.get("limits", {}).get("max_retrieval_calls") == 3
 check("config.yaml", check_config)
 
 def check_ambient():
