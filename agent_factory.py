@@ -16,8 +16,9 @@ from deepagents.backends import FilesystemBackend
 from langchain.chat_models import init_chat_model
 from langgraph.checkpoint.memory import MemorySaver
 
+from langchain.agents.middleware import ToolCallLimitMiddleware
+
 from multi_server_mcp_client import client as mcp_client
-from Tools.tool_guards import ToolCallGuard
 from tools import (
     retrieval_tool,
     ingest_pdf_tool,
@@ -48,16 +49,7 @@ MODEL_NAME = f"{_model_cfg.get('provider', 'openai')}:{_model_cfg.get('name', 'g
 TEMPERATURE = _model_cfg.get("temperature", 0.0)
 MAX_TOKENS = _model_cfg.get("max_tokens", 16384)
 
-_TOOL_GUARD = ToolCallGuard.from_config(_cfg)
-_GUARDED_RETRIEVAL_TOOL, _GUARDED_WEB_SEARCH = _TOOL_GUARD.wrap_tools(
-    retrieval_tool,
-    web_search,
-)
-
-
-def reset_tool_counters():
-    """Reset per-message tool-call counters for a new user turn."""
-    _TOOL_GUARD.reset_for_new_turn()
+_limits = _cfg.get("limits", {})
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -106,9 +98,9 @@ async def create_agent(
     # NOTE: FilesystemBackend auto-injects ls, read_file, write_file,
     # edit_file, glob, grep into all agents — no need to add them here.
     all_tools = [
-        _GUARDED_RETRIEVAL_TOOL,
+        retrieval_tool,
         ingest_pdf_tool,
-        _GUARDED_WEB_SEARCH,
+        web_search,
         list_collections_tool,
         update_memory,
     ] + mcp_tools
@@ -117,10 +109,27 @@ async def create_agent(
         "write_file": {"allowed_decisions": ["approve", "reject"]},
     }
 
+    # -- Tool-call limit middleware (built-in) -----------------------------
+    tool_limit_middleware = [
+        ToolCallLimitMiddleware(
+            tool_name="retrieval_tool",
+            run_limit=_limits.get("max_retrieval_calls", 3),
+            thread_limit=_limits.get("retrieval_thread_limit", 15),
+            exit_behavior="continue",
+        ),
+        ToolCallLimitMiddleware(
+            tool_name="web_search",
+            run_limit=_limits.get("max_web_searches", 3),
+            thread_limit=_limits.get("web_search_thread_limit", 10),
+            exit_behavior="continue",
+        ),
+    ]
+
     agent = create_deep_agent(
         model=model,
         tools=all_tools,
         system_prompt=live_prompt,
+        middleware=tool_limit_middleware,
         backend=FilesystemBackend(root_dir=".", virtual_mode=False),
         interrupt_on=interrupt_on,
         checkpointer=checkpointer,
@@ -150,7 +159,6 @@ async def run_agent(message: str, thread_id: str | None = None, agent=None):
         agent = await create_agent()
 
     config = {"configurable": {"thread_id": thread_id or str(uuid.uuid4())}}
-    reset_tool_counters()
 
     result = await agent.ainvoke(
         {"messages": [{"role": "user", "content": message}]},

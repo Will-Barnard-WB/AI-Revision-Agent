@@ -10,7 +10,10 @@ model:
 
 # Paths
 paths:
-  agent_output: "./AgentOutput"
+  agent_fs: "./agent_fs"           # root of the agent filesystem
+  lectures: "./agent_fs/lectures"   # lecture PDFs (ambient watch dir)
+  documents: "./agent_fs/documents" # generated study guides, practice exams
+  memory: "./agent_fs/memory"       # agent memory, logs, manifest
   templates: "./templates"
   chroma_persist: "."
 
@@ -31,9 +34,9 @@ mcp:
 ambient:
   enabled: true
   poll_interval_seconds: 300  # 5 minutes
-  watch_directory: "./AgentOutput"
-  manifest_file: "./AgentOutput/.processed_manifest.md"
-  log_file: "./AgentOutput/.ambient_log.jsonl"
+  watch_directory: "./agent_fs/lectures"
+  manifest_file: "./agent_fs/memory/.processed_manifest.md"
+  log_file: "./agent_fs/memory/.ambient_log.jsonl"
 
 # Web UI Server
 server:
@@ -42,6 +45,8 @@ server:
 
 # Agent Limits
 limits:
-  max_retrieval_calls: 3
-  max_web_searches: 3
+  max_retrieval_calls: 3           # per run (user turn)
+  max_web_searches: 3              # per run (user turn)
+  retrieval_thread_limit: 15       # per conversation
+  web_search_thread_limit: 10      # per conversation
   max_files_per_session: 5

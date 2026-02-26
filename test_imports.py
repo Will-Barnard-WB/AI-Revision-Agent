@@ -25,10 +25,15 @@ def check_config():
         cfg = yaml.safe_load(f)
     assert "default_collection" not in cfg.get("rag", {})
     assert cfg.get("limits", {}).get("max_retrieval_calls") == 3
+    assert cfg["paths"]["agent_fs"] == "./agent_fs"
+    assert cfg["paths"]["lectures"] == "./agent_fs/lectures"
+    assert cfg["paths"]["documents"] == "./agent_fs/documents"
+    assert cfg["paths"]["memory"] == "./agent_fs/memory"
 check("config.yaml", check_config)
 
 def check_ambient():
     from ambient import _read_manifest, WATCH_DIR
+    assert WATCH_DIR.endswith("agent_fs/lectures"), f"WATCH_DIR wrong: {WATCH_DIR}"
     m = _read_manifest()
     assert "LinearAlgebraNotes.pdf" in m, f"Manifest missing pre-seeded PDF: {m}"
 check("ambient.py + manifest", check_ambient)

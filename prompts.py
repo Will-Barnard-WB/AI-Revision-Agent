@@ -13,7 +13,10 @@ for A/B evaluation.
 import os
 
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
-_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "AgentOutput")
+_AGENT_FS = os.path.join(os.path.dirname(__file__), "agent_fs")
+_LECTURES_DIR = os.path.join(_AGENT_FS, "lectures")
+_DOCUMENTS_DIR = os.path.join(_AGENT_FS, "documents")
+_MEMORY_DIR = os.path.join(_AGENT_FS, "memory")
 
 # ── Main orchestrator ─────────────────────────────────────────────────────
 
@@ -68,8 +71,10 @@ Before giving your final response to the user:
 - After generating flashcards, verify the count matches expectations.
 - If file writing is rejected, ask why and adjust.
 
-## Output directory
-All files should be saved under: {_OUTPUT_DIR}
+## Agent filesystem
+All generated files should be saved under: {_DOCUMENTS_DIR}
+Lecture PDFs live in: {_LECTURES_DIR}
+Agent memory and logs live in: {_MEMORY_DIR}
 
 ## Template directory
 Reference templates for file structures live in: {_TEMPLATES_DIR}

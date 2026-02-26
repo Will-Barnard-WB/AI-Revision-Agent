@@ -14,8 +14,8 @@ POST   /ambient/poll         Trigger immediate poll
 GET    /ambient/log          Recent ambient activity log
 GET    /ambient/manifest     Processed-PDF manifest
 
-GET    /outputs              List files in AgentOutput/
-GET    /outputs/{filename}   Serve a specific output file
+GET    /outputs              List files/folders in agent_fs/
+GET    /outputs/{path:path}  Serve a specific file or list a subfolder
 
 GET    /                     Web UI (HTMX)
 """
@@ -54,7 +54,7 @@ HOST = _server_cfg.get("host", "0.0.0.0")
 PORT = _server_cfg.get("port", 8080)
 
 OUTPUT_DIR = os.path.abspath(
-    _cfg.get("paths", {}).get("agent_output", "./AgentOutput")
+    _cfg.get("paths", {}).get("agent_fs", "./agent_fs")
 )
 
 # ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ async def _broadcast(task_id: str, event: str, data: dict | str):
 
 async def _run_task(task_id: str):
     """Execute the agent task in the background, streaming progress over WS."""
-    from agent_factory import create_agent, reset_tool_counters
+    from agent_factory import create_agent
 
     task = _tasks[task_id]
     task.status = "running"
@@ -132,7 +132,6 @@ async def _run_task(task_id: str):
             config = {"configurable": {"thread_id": task.thread_id}}
             _task_agents[task_id] = (agent, config)
 
-        reset_tool_counters()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": task.message}]},
             config=config,
@@ -315,7 +314,7 @@ async def send_follow_up(task_id: str, body: FollowUpMessage):
 
 async def _run_follow_up(task_id: str, message: str):
     """Run a follow-up message using the cached agent and thread."""
-    from agent_factory import create_agent, reset_tool_counters
+    from agent_factory import create_agent
 
     task = _tasks[task_id]
     await _broadcast(task_id, "status", {"status": "running"})
@@ -330,7 +329,6 @@ async def _run_follow_up(task_id: str, message: str):
             config = {"configurable": {"thread_id": task.thread_id}}
             _task_agents[task_id] = (agent, config)
 
-        reset_tool_counters()
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": message}]},
             config=config,
@@ -437,28 +435,44 @@ async def ambient_manifest():
 # ---------------------------------------------------------------------------
 
 @app.get("/outputs")
-async def list_outputs():
-    if not os.path.isdir(OUTPUT_DIR):
-        return []
-    files = []
-    for f in sorted(os.listdir(OUTPUT_DIR)):
-        if f.startswith("."):
+async def list_outputs(path: str = ""):
+    """List files and folders inside agent_fs/, optionally at a sub-path."""
+    target = os.path.normpath(os.path.join(OUTPUT_DIR, path))
+    # Prevent directory traversal
+    if not target.startswith(OUTPUT_DIR):
+        raise HTTPException(403, "Forbidden")
+    if not os.path.isdir(target):
+        raise HTTPException(404, "Directory not found")
+    items = []
+    for name in sorted(os.listdir(target)):
+        if name.startswith("."):
             continue
-        fpath = os.path.join(OUTPUT_DIR, f)
-        if os.path.isfile(fpath):
-            files.append({
-                "name": f,
-                "size": os.path.getsize(fpath),
+        full = os.path.join(target, name)
+        rel = os.path.relpath(full, OUTPUT_DIR)
+        if os.path.isdir(full):
+            items.append({"name": name, "path": rel, "type": "folder"})
+        else:
+            items.append({
+                "name": name,
+                "path": rel,
+                "type": "file",
+                "size": os.path.getsize(full),
                 "modified": datetime.fromtimestamp(
-                    os.path.getmtime(fpath), tz=timezone.utc
+                    os.path.getmtime(full), tz=timezone.utc
                 ).isoformat(),
             })
-    return files
+    return items
 
 
-@app.get("/outputs/{filename}")
-async def get_output(filename: str):
-    fpath = os.path.join(OUTPUT_DIR, filename)
+@app.get("/outputs/{path:path}")
+async def get_output(path: str):
+    """Serve a file or list a subdirectory inside agent_fs/."""
+    fpath = os.path.normpath(os.path.join(OUTPUT_DIR, path))
+    if not fpath.startswith(OUTPUT_DIR):
+        raise HTTPException(403, "Forbidden")
+    if os.path.isdir(fpath):
+        # If it's a directory, return its listing
+        return await list_outputs(path)
     if not os.path.isfile(fpath):
         raise HTTPException(404, "File not found")
     return FileResponse(fpath)
@@ -491,6 +505,11 @@ async def ui_approvals(request: Request):
 @app.get("/history", response_class=HTMLResponse)
 async def ui_history(request: Request):
     return templates.TemplateResponse("history.html", {"request": request})
+
+
+@app.get("/files", response_class=HTMLResponse)
+async def ui_files(request: Request):
+    return templates.TemplateResponse("files.html", {"request": request})
 
 
 # ---------------------------------------------------------------------------

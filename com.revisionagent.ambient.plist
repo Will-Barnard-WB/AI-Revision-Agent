@@ -37,9 +37,9 @@
 
     <!-- Logs -->
     <key>StandardOutPath</key>
-    <string>/Users/willbarnard/Documents/RevisionAgent/AgentOutput/.ambient_stdout.log</string>
+    <string>/Users/willbarnard/Documents/RevisionAgent/agent_fs/memory/.ambient_stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/willbarnard/Documents/RevisionAgent/AgentOutput/.ambient_stderr.log</string>
+    <string>/Users/willbarnard/Documents/RevisionAgent/agent_fs/memory/.ambient_stderr.log</string>
 
     <!-- Environment variables — API keys loaded from .env by ambient.py -->
     <key>EnvironmentVariables</key>

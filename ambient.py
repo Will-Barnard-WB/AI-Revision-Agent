@@ -1,5 +1,5 @@
 """
-Ambient agent — background cron that watches AgentOutput/ for new PDFs,
+Ambient agent — background cron that watches agent_fs/lectures/ for new PDFs,
 ingests them into the vector DB, and auto-generates flashcards + revision
 materials without any user interaction.
 
@@ -38,9 +38,9 @@ def _load_config() -> dict:
 _cfg = _load_config()
 _amb = _cfg.get("ambient", {})
 
-WATCH_DIR = os.path.abspath(_amb.get("watch_directory", "./AgentOutput"))
-MANIFEST_PATH = os.path.abspath(_amb.get("manifest_file", "./AgentOutput/.processed_manifest.md"))
-LOG_PATH = os.path.abspath(_amb.get("log_file", "./AgentOutput/.ambient_log.jsonl"))
+WATCH_DIR = os.path.abspath(_amb.get("watch_directory", "./agent_fs/lectures"))
+MANIFEST_PATH = os.path.abspath(_amb.get("manifest_file", "./agent_fs/memory/.processed_manifest.md"))
+LOG_PATH = os.path.abspath(_amb.get("log_file", "./agent_fs/memory/.ambient_log.jsonl"))
 POLL_INTERVAL = _amb.get("poll_interval_seconds", 300)
 
 

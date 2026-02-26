@@ -137,7 +137,7 @@ def ingest_pdf_tool(pdf_file_path: str, collection: str | None = None) -> str:
     """Ingest a PDF into the vector database so its content becomes searchable.
 
     **When to use this tool**
-    - A new PDF has appeared (e.g. the user dropped it into AgentOutput/).
+    - A new PDF has appeared (e.g. the user dropped it into agent_fs/lectures/).
     - The user explicitly asks to add a document.
 
     **Idempotency note**
@@ -218,7 +218,7 @@ def web_search(
 # Memory management
 # ---------------------------------------------------------------------------
 
-_MEMORY_PATH = os.path.join(os.path.dirname(__file__), "AgentOutput", ".agent_memory.md")
+_MEMORY_PATH = os.path.join(os.path.dirname(__file__), "agent_fs", "memory", ".agent_memory.md")
 _MEMORY_CAP = 50  # max entries in Recent Activity
 
 

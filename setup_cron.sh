@@ -59,7 +59,7 @@ do_install() {
   echo -e "${GREEN}✓${NC} Daemon loaded and started"
   echo ""
   echo -e "${GREEN}🔄 Ambient agent is now running in the background!${NC}"
-  echo "   It will watch AgentOutput/ for new PDFs every 5 minutes."
+  echo "   It will watch agent_fs/lectures/ for new PDFs every 5 minutes."
   echo "   It survives terminal closures and restarts on login."
   echo ""
   echo "   Check status:   $0 status"
@@ -84,7 +84,7 @@ do_status() {
 }
 
 do_logs() {
-  LOG_DIR="$(cd "$(dirname "$0")" && pwd)/AgentOutput"
+  LOG_DIR="$(cd "$(dirname "$0")" && pwd)/agent_fs/memory"
   echo "=== Ambient JSONL log (last 20 entries) ==="
   if [ -f "$LOG_DIR/.ambient_log.jsonl" ]; then
     tail -20 "$LOG_DIR/.ambient_log.jsonl"

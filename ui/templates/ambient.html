@@ -6,7 +6,7 @@
     <header class="mb-6">
         <h2 class="text-lg font-semibold">🔄 Ambient Dashboard</h2>
         <p class="text-sm text-slate-500">
-            Automatically detects new PDFs in AgentOutput/ and generates flashcards + study materials
+            Automatically detects new PDFs in agent_fs/lectures/ and generates flashcards + study materials
         </p>
     </header>
 
@@ -71,7 +71,7 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
             const data = JSON.parse(evt.detail.target.innerText);
             const files = data.processed || [];
             if (files.length === 0) {
-                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No PDFs processed yet. Drop a PDF into AgentOutput/ to get started.</p>';
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No PDFs processed yet. Drop a PDF into agent_fs/lectures/ to get started.</p>';
             } else {
                 let html = '<div class="flex flex-wrap gap-2">';
                 files.forEach(f => {

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% set active = "files" %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
+    <!-- File tree sidebar -->
+    <div class="w-64 flex-shrink-0 border-r border-slate-700 bg-slate-900/50 flex flex-col">
+        <div class="p-4 border-b border-slate-700">
+            <h3 class="text-sm font-semibold text-slate-300">📁 Agent Filesystem</h3>
+        </div>
+        <div id="file-tree" class="flex-1 overflow-y-auto p-2 text-sm">
+            Loading…
+        </div>
+    </div>
+
+    <!-- Main content area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Breadcrumb bar -->
+        <div id="breadcrumbs" class="px-5 py-3 border-b border-slate-700 bg-slate-900/30 text-sm flex items-center gap-1">
+            <a href="#" class="breadcrumb-link" onclick="navigateTo('')">agent_fs</a>
+        </div>
+
+        <!-- File content / folder listing -->
+        <div id="file-content" class="flex-1 overflow-y-auto p-6">
+            <div class="text-center text-slate-500 mt-20">
+                <div class="text-4xl mb-3">📂</div>
+                <p>Select a file from the sidebar to preview it</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const FILE_ICONS = {
+    pdf: '📕', md: '📝', txt: '📄', json: '📊',
+    csv: '📊', py: '🐍', yaml: '⚙️', yml: '⚙️',
+};
+
+let currentPath = '';
+let expandedFolders = new Set(['']);  // root is expanded by default
+
+function getIcon(name, type) {
+    if (type === 'folder') return '📁';
+    const ext = name.split('.').pop().toLowerCase();
+    return FILE_ICONS[ext] || '📄';
+}
+
+function formatSize(bytes) {
+    if (bytes > 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes > 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return bytes + ' B';
+}
+
+// ── File tree ──────────────────────────────────────────────────────────
+
+async function loadTree(path = '') {
+    try {
+        const url = path ? `/outputs?path=${encodeURIComponent(path)}` : '/outputs';
+        const resp = await fetch(url);
+        const items = await resp.json();
+        return items;
+    } catch (e) {
+        console.error('Failed to load tree:', e);
+        return [];
+    }
+}
+
+async function renderTree() {
+    const tree = document.getElementById('file-tree');
+    tree.innerHTML = await buildTreeHTML('', 0);
+}
+
+async function buildTreeHTML(path, depth) {
+    const items = await loadTree(path);
+    let html = '';
+
+    // Folders first, then files
+    const folders = items.filter(i => i.type === 'folder');
+    const files = items.filter(i => i.type === 'file');
+
+    for (const folder of folders) {
+        const isExpanded = expandedFolders.has(folder.path);
+        const indent = depth * 16;
+        html += `<div class="tree-item folder" style="padding-left:${indent}px">
+            <a href="#" class="tree-link flex items-center gap-1.5 px-2 py-1 rounded hover:bg-slate-800 w-full"
+               onclick="toggleFolder('${folder.path}'); return false;">
+                <span class="text-xs text-slate-500">${isExpanded ? '▾' : '▸'}</span>
+                <span>${getIcon(folder.name, 'folder')}</span>
+                <span class="text-slate-300 truncate">${folder.name}</span>
+            </a>
+        </div>`;
+        if (isExpanded) {
+            html += await buildTreeHTML(folder.path, depth + 1);
+        }
+    }
+
+    for (const file of files) {
+        const indent = depth * 16;
+        const isActive = currentPath === file.path;
+        html += `<div class="tree-item file" style="padding-left:${indent}px">
+            <a href="#" class="tree-link flex items-center gap-1.5 px-2 py-1 rounded w-full
+                      ${isActive ? 'bg-indigo-600/20 text-indigo-400' : 'hover:bg-slate-800 text-slate-400'}"
+               onclick="openFile('${file.path}'); return false;">
+                <span class="text-xs" style="visibility:hidden">▸</span>
+                <span>${getIcon(file.name, 'file')}</span>
+                <span class="truncate">${file.name}</span>
+            </a>
+        </div>`;
+    }
+
+    return html;
+}
+
+async function toggleFolder(path) {
+    if (expandedFolders.has(path)) {
+        expandedFolders.delete(path);
+    } else {
+        expandedFolders.add(path);
+    }
+    await renderTree();
+}
+
+// ── Breadcrumbs ────────────────────────────────────────────────────────
+
+function updateBreadcrumbs(path) {
+    const el = document.getElementById('breadcrumbs');
+    let html = `<a href="#" class="breadcrumb-link" onclick="navigateTo(''); return false;">agent_fs</a>`;
+    if (path) {
+        const parts = path.split('/');
+        let cumulative = '';
+        for (let i = 0; i < parts.length; i++) {
+            cumulative += (i > 0 ? '/' : '') + parts[i];
+            const isLast = i === parts.length - 1;
+            html += `<span class="text-slate-600 mx-1">/</span>`;
+            if (isLast) {
+                html += `<span class="text-slate-200">${parts[i]}</span>`;
+            } else {
+                html += `<a href="#" class="breadcrumb-link" onclick="navigateTo('${cumulative}'); return false;">${parts[i]}</a>`;
+            }
+        }
+    }
+    el.innerHTML = html;
+}
+
+async function navigateTo(path) {
+    expandedFolders.add(path);
+    await renderTree();
+    // Show folder listing in main area
+    const items = await loadTree(path);
+    updateBreadcrumbs(path);
+    renderFolderListing(items, path);
+}
+
+// ── Folder listing (main area) ──────────────────────────────────────────
+
+function renderFolderListing(items, path) {
+    const el = document.getElementById('file-content');
+    currentPath = '';
+    if (items.length === 0) {
+        el.innerHTML = `<div class="text-center text-slate-500 mt-20">
+            <div class="text-4xl mb-3">📂</div>
+            <p>This folder is empty</p>
+        </div>`;
+        return;
+    }
+
+    let html = '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">';
+    for (const item of items) {
+        const icon = getIcon(item.name, item.type);
+        const meta = item.type === 'folder'
+            ? 'Folder'
+            : `${formatSize(item.size)} · ${new Date(item.modified).toLocaleDateString()}`;
+        const onclick = item.type === 'folder'
+            ? `navigateTo('${item.path}')`
+            : `openFile('${item.path}')`;
+
+        html += `<a href="#" onclick="${onclick}; return false;"
+                    class="p-4 bg-slate-800/50 rounded-lg border border-slate-700
+                           hover:border-indigo-500/50 transition-colors group">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">${icon}</span>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-slate-300 group-hover:text-indigo-400 transition-colors truncate">${item.name}</p>
+                    <p class="text-xs text-slate-500">${meta}</p>
+                </div>
+            </div>
+        </a>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+// ── File preview ────────────────────────────────────────────────────────
+
+async function openFile(path) {
+    currentPath = path;
+    updateBreadcrumbs(path);
+    await renderTree();  // re-render to update active highlight
+
+    const el = document.getElementById('file-content');
+    const ext = path.split('.').pop().toLowerCase();
+    const filename = path.split('/').pop();
+
+    if (ext === 'md') {
+        // Fetch and render markdown
+        el.innerHTML = '<div class="text-slate-500">Loading…</div>';
+        try {
+            const resp = await fetch(`/outputs/${encodeURIComponent(path)}`);
+            const text = await resp.text();
+            el.innerHTML = `
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-slate-200">${filename}</h2>
+                    <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
+                       class="text-xs text-indigo-400 hover:text-indigo-300">↗ Raw file</a>
+                </div>
+                <div class="prose prose-invert prose-sm max-w-none file-preview-md">${marked.parse(text)}</div>
+            `;
+        } catch (e) {
+            el.innerHTML = `<p class="text-red-400">Failed to load file: ${e.message}</p>`;
+        }
+    } else if (ext === 'pdf') {
+        el.innerHTML = `
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-200">${filename}</h2>
+                <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
+                   class="text-xs text-indigo-400 hover:text-indigo-300">↗ Download</a>
+            </div>
+            <iframe src="/outputs/${encodeURIComponent(path)}" class="w-full rounded-lg border border-slate-700"
+                    style="height: calc(100vh - 12rem)"></iframe>
+        `;
+    } else if (['json', 'jsonl', 'txt', 'yaml', 'yml', 'csv', 'py'].includes(ext)) {
+        el.innerHTML = '<div class="text-slate-500">Loading…</div>';
+        try {
+            const resp = await fetch(`/outputs/${encodeURIComponent(path)}`);
+            const text = await resp.text();
+            el.innerHTML = `
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-slate-200">${filename}</h2>
+                    <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
+                       class="text-xs text-indigo-400 hover:text-indigo-300">↗ Raw file</a>
+                </div>
+                <pre class="bg-slate-900 border border-slate-700 rounded-lg p-4 overflow-x-auto text-sm text-slate-300">${escapeHtml(text)}</pre>
+            `;
+        } catch (e) {
+            el.innerHTML = `<p class="text-red-400">Failed to load file: ${e.message}</p>`;
+        }
+    } else {
+        el.innerHTML = `
+            <div class="text-center text-slate-500 mt-20">
+                <div class="text-4xl mb-3">${getIcon(filename, 'file')}</div>
+                <h3 class="font-medium text-slate-300 mb-2">${filename}</h3>
+                <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
+                   class="text-indigo-400 hover:text-indigo-300 text-sm">↗ Download file</a>
+            </div>
+        `;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await renderTree();
+    // Show root folder listing by default
+    const items = await loadTree('');
+    renderFolderListing(items, '');
+});
+</script>
+{% endblock %}
