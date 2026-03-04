@@ -21,19 +21,22 @@ GET    /                     Web UI (HTMX)
 """
 
 import asyncio
+import hashlib
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import yaml
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from langchain.chat_models import init_chat_model
 
 from ambient import Ambient, read_log, MANIFEST_PATH, WATCH_DIR, _read_manifest
 
@@ -56,6 +59,13 @@ PORT = _server_cfg.get("port", 8080)
 OUTPUT_DIR = os.path.abspath(
     _cfg.get("paths", {}).get("agent_fs", "./agent_fs")
 )
+_model_cfg = _cfg.get("model", {})
+_summary_cfg = _cfg.get("summaries", {})
+
+SUMMARY_INPUT_CHAR_LIMIT = int(_summary_cfg.get("max_input_chars", 4000))
+SUMMARY_OUTPUT_CHAR_LIMIT = int(_summary_cfg.get("max_output_chars", 600))
+MAX_ACTIVITY_SUMMARIES_PER_REQUEST = int(_summary_cfg.get("max_activity_summaries_per_request", 8))
+TASK_SUMMARY_OUTPUT_CHAR_LIMIT = int(_summary_cfg.get("max_task_summary_chars", 220))
 
 # ---------------------------------------------------------------------------
 # App
@@ -80,8 +90,11 @@ class Task(BaseModel):
     created_at: str = ""
     completed_at: str = ""
     result_summary: str = ""
+    conversation_turns: list[dict] = Field(default_factory=list)
+    conversation_summary: str = ""
+    conversation_summary_hash: str = ""
     interrupt_payload: Optional[dict] = None  # set when status == awaiting_approval
-    output_files: list[str] = []
+    output_files: list[str] = Field(default_factory=list)
     source: str = "user"               # user | ambient
 
 _tasks: dict[str, Task] = {}
@@ -89,6 +102,146 @@ _task_agents: dict[str, tuple] = {}   # task_id -> (agent, config) — reused fo
 _interrupt_events: dict[str, asyncio.Event] = {}
 _interrupt_decisions: dict[str, list] = {}
 _ws_connections: dict[str, list[WebSocket]] = {}  # task_id -> list of WS
+_activity_summary_cache: dict[str, str] = {}
+_summary_model = None
+
+
+def _truncate(text: str, n: int) -> str:
+    text = (text or "").strip()
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def _extract_text_content(content: Any) -> str:
+    """Extract plain text from str or Anthropic/OpenAI content blocks."""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "text" and item.get("text"):
+                    parts.append(str(item.get("text")))
+            elif hasattr(item, "text"):
+                parts.append(str(getattr(item, "text")))
+        return "\n".join(p.strip() for p in parts if p and str(p).strip()).strip()
+    return ""
+
+
+def _last_assistant_text(messages: list[Any]) -> str:
+    for msg in reversed(messages or []):
+        cls = msg.__class__.__name__.lower()
+        role = getattr(msg, "role", "")
+        if "ai" not in cls and role != "assistant":
+            continue
+        content = getattr(msg, "content", None)
+        text = _extract_text_content(content)
+        if text:
+            return text
+    return ""
+
+
+def _fallback_thread_summary(turns: list[dict], default: str = "") -> str:
+    user_turns = [t.get("text", "") for t in turns if t.get("role") == "user" and t.get("text")]
+    ai_turns = [t.get("text", "") for t in turns if t.get("role") == "assistant" and t.get("text")]
+    if user_turns and ai_turns:
+        return _truncate(
+            f"User asked about {user_turns[-1]}. Agent responded with an explanation and next-step support.",
+            TASK_SUMMARY_OUTPUT_CHAR_LIMIT,
+        )
+    if ai_turns:
+        return _truncate(ai_turns[-1], TASK_SUMMARY_OUTPUT_CHAR_LIMIT)
+    return _truncate(default or "Task completed.", TASK_SUMMARY_OUTPUT_CHAR_LIMIT)
+
+
+def _conversation_hash(turns: list[dict]) -> str:
+    payload = json.dumps(turns or [], ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _activity_entry_hash(entry: dict) -> str:
+    payload = f"{entry.get('date','')}|{entry.get('action','')}|{entry.get('description','')}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _get_summary_model():
+    global _summary_model
+    if _summary_model is None:
+        provider = _model_cfg.get("provider", "anthropic")
+        name = _model_cfg.get("name", "claude-sonnet-4-6")
+        model_name = f"{provider}:{name}"
+        _summary_model = init_chat_model(
+            model=model_name,
+            temperature=0.0,
+            max_tokens=int(_summary_cfg.get("max_model_tokens", 700)),
+        )
+    return _summary_model
+
+
+async def _summarize_text(prompt: str, fallback: str) -> str:
+    """LLM summary helper with safe fallback and output truncation."""
+    try:
+        model = _get_summary_model()
+        resp = await model.ainvoke([
+            {
+                "role": "system",
+                "content": "Write concise plain-English summaries. Keep factual and avoid adding new facts.",
+            },
+            {"role": "user", "content": _truncate(prompt, SUMMARY_INPUT_CHAR_LIMIT)},
+        ])
+        text = _extract_text_content(getattr(resp, "content", ""))
+        return _truncate(text or fallback, SUMMARY_OUTPUT_CHAR_LIMIT)
+    except Exception:
+        return _truncate(fallback, SUMMARY_OUTPUT_CHAR_LIMIT)
+
+
+async def _refresh_task_conversation_summary(task: Task):
+    turns = task.conversation_turns or []
+    if not turns:
+        task.conversation_summary = _truncate(task.result_summary or task.message, TASK_SUMMARY_OUTPUT_CHAR_LIMIT)
+        task.conversation_summary_hash = ""
+        return
+
+    digest = _conversation_hash(turns)
+    if digest == task.conversation_summary_hash and task.conversation_summary:
+        return
+
+    snippets: list[str] = []
+    for t in turns[-8:]:
+        role = t.get("role", "assistant")
+        text = _truncate(t.get("text", ""), 280)
+        snippets.append(f"{role.upper()}: {text}")
+    transcript = "\n".join(snippets)
+
+    prompt = (
+        "Summarise this full conversation thread for a small task-history card in plain English. "
+        "Output 1-2 short sentences only (max 45 words). Include user goal and outcome.\n\n"
+        f"{transcript}"
+    )
+    fallback = _fallback_thread_summary(turns, task.result_summary or task.message or "Task completed.")
+    task.conversation_summary = _truncate(
+        await _summarize_text(prompt, fallback),
+        TASK_SUMMARY_OUTPUT_CHAR_LIMIT,
+    )
+    task.conversation_summary_hash = digest
+
+
+async def _plain_english_activity_summary(entry: dict) -> str:
+    key = _activity_entry_hash(entry)
+    cached = _activity_summary_cache.get(key)
+    if cached:
+        return cached
+
+    action = entry.get("action", "note")
+    description = entry.get("description", "")
+    prompt = (
+        "Rewrite this activity log line in plain English in one short sentence. "
+        "Keep exact meaning and avoid extra assumptions.\n\n"
+        f"Action: {action}\nDescription: {description}"
+    )
+    fallback = f"{action}: {description}".strip()
+    summary = await _summarize_text(prompt, fallback)
+    _activity_summary_cache[key] = summary
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +273,11 @@ async def _run_task(task_id: str):
     task = _tasks[task_id]
     task.status = "running"
     task.thread_id = f"task-{task_id}"
+    task.conversation_turns.append({
+        "role": "user",
+        "text": task.message,
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
     await _broadcast(task_id, "status", {"status": "running"})
 
     try:
@@ -162,18 +320,25 @@ async def _run_task(task_id: str):
 
         # Extract summary from last AI message
         messages = result.get("messages", [])
-        summary = ""
-        for msg in reversed(messages):
-            if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content.strip():
-                summary = msg.content
-                break
+        summary = _last_assistant_text(messages)
+        if summary:
+            task.conversation_turns.append({
+                "role": "assistant",
+                "text": summary,
+                "at": datetime.now(timezone.utc).isoformat(),
+            })
 
         task.status = "completed"
         task.completed_at = datetime.now(timezone.utc).isoformat()
         task.result_summary = summary
         task.interrupt_payload = None
+        await _refresh_task_conversation_summary(task)
 
-        await _broadcast(task_id, "status", {"status": "completed", "summary": summary})
+        await _broadcast(task_id, "status", {
+            "status": "completed",
+            "summary": summary,
+            "conversation_summary": task.conversation_summary,
+        })
 
     except Exception as e:
         task.status = "failed"
@@ -317,6 +482,11 @@ async def _run_follow_up(task_id: str, message: str):
     from agent_factory import create_agent
 
     task = _tasks[task_id]
+    task.conversation_turns.append({
+        "role": "user",
+        "text": message,
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
     await _broadcast(task_id, "status", {"status": "running"})
 
     try:
@@ -354,17 +524,24 @@ async def _run_follow_up(task_id: str, message: str):
             )
 
         messages = result.get("messages", [])
-        summary = ""
-        for msg in reversed(messages):
-            if hasattr(msg, "content") and isinstance(msg.content, str) and msg.content.strip():
-                summary = msg.content
-                break
+        summary = _last_assistant_text(messages)
+        if summary:
+            task.conversation_turns.append({
+                "role": "assistant",
+                "text": summary,
+                "at": datetime.now(timezone.utc).isoformat(),
+            })
 
         task.status = "completed"
         task.completed_at = datetime.now(timezone.utc).isoformat()
         task.result_summary = summary
         task.interrupt_payload = None
-        await _broadcast(task_id, "status", {"status": "completed", "summary": summary})
+        await _refresh_task_conversation_summary(task)
+        await _broadcast(task_id, "status", {
+            "status": "completed",
+            "summary": summary,
+            "conversation_summary": task.conversation_summary,
+        })
 
     except Exception as e:
         task.status = "failed"
@@ -445,7 +622,7 @@ async def list_outputs(path: str = ""):
         raise HTTPException(404, "Directory not found")
     items = []
     for name in sorted(os.listdir(target)):
-        if name.startswith("."):
+        if name.startswith(".") or name == "memory":
             continue
         full = os.path.join(target, name)
         rel = os.path.relpath(full, OUTPUT_DIR)
@@ -476,6 +653,94 @@ async def get_output(path: str):
     if not os.path.isfile(fpath):
         raise HTTPException(404, "File not found")
     return FileResponse(fpath)
+
+
+# ---------------------------------------------------------------------------
+# REST: History (persistent from agent memory)
+# ---------------------------------------------------------------------------
+
+MEMORY_PATH = os.path.join(OUTPUT_DIR, "memory", ".agent_memory.md")
+
+@app.get("/api/history")
+async def api_history(limit: int = 10):
+    """Parse Recent Activity from .agent_memory.md and return structured JSON."""
+    entries: list[dict] = []
+    try:
+        if not os.path.isfile(MEMORY_PATH):
+            return entries
+        with open(MEMORY_PATH, "r") as f:
+            content = f.read()
+
+        # Find the ## Recent Activity section
+        in_section = False
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("## Recent Activity"):
+                in_section = True
+                continue
+            if in_section and stripped.startswith("## "):
+                break  # next section
+            if in_section and stripped.startswith("- "):
+                # Parse canonical or relaxed format
+                m = re.match(r"^-\s*\[([^\]]+)\]\s*([^:]+):\s*(.*)$", stripped)
+                if m:
+                    date_str = m.group(1).strip()
+                    action = m.group(2).strip()
+                    description = m.group(3).strip()
+                else:
+                    date_str = ""
+                    action = "note"
+                    description = re.sub(r"^-\s*", "", stripped).strip()
+
+                entries.append({
+                    "date": date_str,
+                    "action": action,
+                    "description": description,
+                })
+    except Exception:
+        pass
+
+    # Return newest first, capped at limit
+    entries = list(reversed(entries))
+    entries = entries[: max(1, min(limit, 50))]
+
+    # Plain-English summaries (cached)
+    for idx, entry in enumerate(entries):
+        if idx < MAX_ACTIVITY_SUMMARIES_PER_REQUEST:
+            entry["plain_summary"] = await _plain_english_activity_summary(entry)
+        else:
+            entry["plain_summary"] = _truncate(
+                f"{entry.get('action', 'note')}: {entry.get('description', '')}",
+                SUMMARY_OUTPUT_CHAR_LIMIT,
+            )
+
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# REST: Upload lecture PDF
+# ---------------------------------------------------------------------------
+
+LECTURES_DIR = os.path.join(OUTPUT_DIR, "lectures")
+
+@app.post("/upload-lecture")
+async def upload_lecture(file: UploadFile = File(...)):
+    """Upload a PDF to agent_fs/lectures/ for ambient processing."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Only PDF files are accepted")
+
+    os.makedirs(LECTURES_DIR, exist_ok=True)
+    dest = os.path.join(LECTURES_DIR, file.filename)
+
+    # Avoid overwriting
+    if os.path.exists(dest):
+        raise HTTPException(409, f"File '{file.filename}' already exists in lectures/")
+
+    content = await file.read()
+    with open(dest, "wb") as f:
+        f.write(content)
+
+    return {"status": "uploaded", "filename": file.filename, "path": f"lectures/{file.filename}"}
 
 
 # ---------------------------------------------------------------------------

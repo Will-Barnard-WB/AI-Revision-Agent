@@ -15,9 +15,9 @@
 <body class="min-h-screen flex">
     <!-- Sidebar -->
     <aside class="sidebar w-56 flex-shrink-0 flex flex-col py-6 px-3 fixed h-full z-10">
-        <div class="mb-8 px-3">
-            <h1 class="text-xl font-bold text-indigo-400">📚 RevisionAgent</h1>
-            <p class="text-xs text-slate-500 mt-1">Ambient AI Revision</p>
+        <div class="mb-8 px-3" onclick="window.location='/'" style="cursor:pointer">
+                <h1 class="text-xl font-bold text-indigo-400">📚 RevisionAgent</h1>
+                <p class="text-xs text-slate-500 mt-1">Ambient AI Revision</p>
         </div>
 
         <nav class="flex flex-col gap-1 flex-1">
@@ -70,7 +70,7 @@
                         ? '<span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1.5" style="animation:pulse 2s infinite"></span>'
                         : '<span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-1.5"></span>';
                     const src = d.source ? ` <span class="text-slate-600">(${d.source})</span>` : '';
-                    evt.detail.target.innerHTML = `<div class="flex items-center">${dot}<span>${d.running ? 'Cron active' : 'Cron stopped'}${src}</span></div>`;
+                    evt.detail.target.innerHTML = `<div class="flex items-center justify-center text-center">${dot}<span>${d.running ? 'Automatic processing is ON' : 'Automatic processing is OFF'}${src}</span></div>`;
                 } catch(e) {}
             }
             if (evt.detail.target.id === 'sidebar-approval-count') {

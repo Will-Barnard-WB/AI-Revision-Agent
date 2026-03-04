@@ -5,8 +5,12 @@ agent can plan autonomously from tool descriptions alone (Claude-Code style).
 
 import os
 import httpx
+import tempfile
+import threading
+import re
 from pathlib import Path
 from typing import List
+from datetime import datetime, timezone
 
 from langchain_core.tools import tool, InjectedToolArg
 from langchain_chroma import Chroma
@@ -73,12 +77,12 @@ def retrieval_tool(query: str, collection: str | None = None) -> str:
 
         **Tips for good queries**
     - Be specific: "definition of eigenvalue" beats "eigenvalues".
-    - Try multiple angles if first results are thin (e.g. definition, then
-      properties, then examples).
+        - Keep scope narrow (one concept / one section at a time).
 
     **If results are insufficient**
-    - Rephrase with different keywords and call again.
-    - After 2–3 attempts, fall back to ``web_search`` for supplementary info.
+        - Do at most one focused retry with a sharper query.
+        - If still thin, ask the user to narrow scope before further retrieval.
+        - Use ``web_search`` only if local notes are clearly insufficient.
 
     Parameters
     ----------
@@ -220,21 +224,63 @@ def web_search(
 
 _MEMORY_PATH = os.path.join(os.path.dirname(__file__), "agent_fs", "memory", ".agent_memory.md")
 _MEMORY_CAP = 50  # max entries in Recent Activity
+_MEMORY_LOCK = threading.RLock()
 
 
 def _read_memory() -> str:
     """Read the full agent memory file, or return empty string."""
-    if os.path.exists(_MEMORY_PATH):
-        with open(_MEMORY_PATH, "r") as f:
-            return f.read()
+    with _MEMORY_LOCK:
+        if os.path.exists(_MEMORY_PATH):
+            with open(_MEMORY_PATH, "r") as f:
+                return f.read()
     return ""
 
 
 def _write_memory(content: str):
     """Write the full agent memory file."""
-    os.makedirs(os.path.dirname(_MEMORY_PATH), exist_ok=True)
-    with open(_MEMORY_PATH, "w") as f:
-        f.write(content)
+    with _MEMORY_LOCK:
+        os.makedirs(os.path.dirname(_MEMORY_PATH), exist_ok=True)
+        directory = os.path.dirname(_MEMORY_PATH)
+        fd, tmp_path = tempfile.mkstemp(prefix=".agent_memory.", suffix=".tmp", dir=directory)
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, _MEMORY_PATH)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+
+def _normalize_recent_activity_lines(content: str) -> str:
+    """Normalize Recent Activity lines to tool-owned date format.
+
+    Output format per line:
+    - [YYYY-MM-DD] action: description
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    normalized: list[str] = []
+
+    for raw in content.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+
+        # Remove bullet/date prefix if present
+        line = re.sub(r"^-\s*", "", line)
+        line = re.sub(r"^\[[^\]]+\]\s*", "", line)
+
+        action = "note"
+        description = line
+        if ":" in line:
+            maybe_action, maybe_desc = line.split(":", 1)
+            if maybe_action.strip():
+                action = maybe_action.strip().lower().replace(" ", "-")
+                description = maybe_desc.strip() or "(no details)"
+        normalized.append(f"- [{today}] {action}: {description}")
+
+    return "\n".join(normalized)
 
 
 def _cap_recent_activity(memory_text: str) -> str:
@@ -311,95 +357,105 @@ def update_memory(section: str, content: str, mode: str = "append") -> str:
     if section not in valid_sections:
         return f"❌ Invalid section '{section}'. Must be one of: {', '.join(sorted(valid_sections))}"
 
-    memory = _read_memory()
-    if not memory.strip():
-        return "❌ Memory file not found or empty."
+    if mode not in {"append", "replace"}:
+        return "❌ Invalid mode. Use 'append' or 'replace'."
 
-    heading = f"## {section}"
-    lines = memory.split("\n")
-    new_lines: list[str] = []
-    in_target = False
-    section_inserted = False
+    if section == "Recent Activity":
+        content = _normalize_recent_activity_lines(content)
 
-    for line in lines:
-        if line.strip() == heading:
-            in_target = True
-            new_lines.append(line)
-            continue
-        if in_target and line.strip().startswith("## "):
-            # End of target section — insert content
+    with _MEMORY_LOCK:
+        memory = _read_memory()
+        if not memory.strip():
+            return "❌ Memory file not found or empty."
+
+        heading = f"## {section}"
+        lines = memory.split("\n")
+        new_lines: list[str] = []
+        in_target = False
+        section_inserted = False
+        heading_found = False
+
+        for line in lines:
+            if line.strip() == heading:
+                in_target = True
+                heading_found = True
+                new_lines.append(line)
+                continue
+            if in_target and line.strip().startswith("## "):
+                # End of target section — insert content
+                if mode == "replace":
+                    new_lines.append(content)
+                    new_lines.append("")
+                # append mode: content already added below
+                in_target = False
+                section_inserted = True
+                new_lines.append(line)
+                continue
+            if in_target and mode == "append":
+                new_lines.append(line)
+                # Insert after last non-blank line in section
+            elif in_target and mode == "replace":
+                continue  # skip existing section content
+            else:
+                new_lines.append(line)
+
+        if not heading_found:
+            return f"❌ Section heading not found: '{section}'"
+
+        # If section was the last one (no next heading found)
+        if in_target and not section_inserted:
             if mode == "replace":
                 new_lines.append(content)
                 new_lines.append("")
-            # append mode: content already added below
+            # For append, we add below
+
+        if mode == "append":
+            # Find the heading and append after the section content
+            result_lines: list[str] = []
             in_target = False
-            section_inserted = True
-            new_lines.append(line)
-            continue
-        if in_target and mode == "append":
-            new_lines.append(line)
-            # Insert after last non-blank line in section
-        elif in_target and mode == "replace":
-            continue  # skip existing section content
-        else:
-            new_lines.append(line)
-
-    # If section was the last one (no next heading found)
-    if in_target and not section_inserted:
-        if mode == "replace":
-            new_lines.append(content)
-            new_lines.append("")
-        # For append, we add below
-
-    if mode == "append":
-        # Find the heading and append after the section content
-        result_lines: list[str] = []
-        in_target = False
-        appended = False
-        for line in new_lines:
-            if line.strip() == heading:
-                in_target = True
+            appended = False
+            for line in new_lines:
+                if line.strip() == heading:
+                    in_target = True
+                    result_lines.append(line)
+                    continue
+                if in_target and line.strip().startswith("## "):
+                    # Insert content before the next section
+                    for c in content.strip().split("\n"):
+                        result_lines.append(c)
+                    result_lines.append("")
+                    in_target = False
+                    appended = True
+                    result_lines.append(line)
+                    continue
                 result_lines.append(line)
-                continue
-            if in_target and line.strip().startswith("## "):
-                # Insert content before the next section
+
+            if in_target and not appended:
+                # Section was last — append at end
                 for c in content.strip().split("\n"):
                     result_lines.append(c)
                 result_lines.append("")
-                in_target = False
-                appended = True
-                result_lines.append(line)
-                continue
-            result_lines.append(line)
 
-        if in_target and not appended:
-            # Section was last — append at end
-            for c in content.strip().split("\n"):
-                result_lines.append(c)
-            result_lines.append("")
+            new_lines = result_lines
 
-        new_lines = result_lines
+        # Update timestamp
+        final = "\n".join(new_lines)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        final = final.replace(
+            "<!-- Last updated: (will be set by agent) -->",
+            f"<!-- Last updated: {now} -->",
+        )
+        # Also update if it already has a date
+        final = re.sub(
+            r"<!-- Last updated: .* -->",
+            f"<!-- Last updated: {now} -->",
+            final,
+        )
 
-    # Update timestamp
-    final = "\n".join(new_lines)
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    final = final.replace(
-        "<!-- Last updated: (will be set by agent) -->",
-        f"<!-- Last updated: {now} -->",
-    )
-    # Also update if it already has a date
-    import re as _re
-    final = _re.sub(
-        r"<!-- Last updated: .* -->",
-        f"<!-- Last updated: {now} -->",
-        final,
-    )
+        # Cap recent activity
+        final = _cap_recent_activity(final)
 
-    # Cap recent activity
-    final = _cap_recent_activity(final)
-
-    _write_memory(final)
+        _write_memory(final)
     return f"✅ Memory updated: '{section}' ({mode})"
 
 

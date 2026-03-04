@@ -115,13 +115,13 @@ async def create_agent(
             tool_name="retrieval_tool",
             run_limit=_limits.get("max_retrieval_calls", 3),
             thread_limit=_limits.get("retrieval_thread_limit", 15),
-            exit_behavior="continue",
+            exit_behavior="end",
         ),
         ToolCallLimitMiddleware(
             tool_name="web_search",
             run_limit=_limits.get("max_web_searches", 3),
             thread_limit=_limits.get("web_search_thread_limit", 10),
-            exit_behavior="continue",
+            exit_behavior="end",
         ),
     ]
 

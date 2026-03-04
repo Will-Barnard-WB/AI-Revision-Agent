@@ -8,6 +8,14 @@
         <div class="p-4 border-b border-slate-700">
             <h3 class="text-sm font-semibold text-slate-300">📁 Agent Filesystem</h3>
         </div>
+        <!-- Upload lecture button -->
+        <div class="p-3 border-b border-slate-700">
+            <label class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-2 rounded-lg cursor-pointer transition-colors w-full">
+                📤 Upload Lecture Notes
+                <input type="file" accept=".pdf" class="hidden" id="lecture-upload" onchange="uploadLecture(this)">
+            </label>
+            <p id="upload-status" class="text-xs text-slate-500 mt-1.5 text-center hidden"></p>
+        </div>
         <div id="file-tree" class="flex-1 overflow-y-auto p-2 text-sm">
             Loading…
         </div>
@@ -209,24 +217,71 @@ async function openFile(path) {
         try {
             const resp = await fetch(`/outputs/${encodeURIComponent(path)}`);
             const text = await resp.text();
+            const isTemplate = path.startsWith('templates/');
+            const isDocument = path.startsWith('documents/');
+
+            let banner = '';
+            if (isTemplate) {
+                banner = `
+                <div class="mb-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg">
+                    <p class="text-sm text-indigo-300 mb-2">✨ This is an output template — the agent uses it to structure generated content. You can customise it by chatting with the agent.</p>
+                    <a href="/chat?prompt=${encodeURIComponent('I\'d like to modify the ' + filename + ' template. Here\'s what I want to change: ')}"
+                       class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                        💬 Customise in Chat
+                    </a>
+                </div>`;
+            } else if (isDocument) {
+                let chatPrompt = '';
+                let chatLabel = '';
+                const lower = filename.toLowerCase();
+                if (lower.includes('practice_exam') || lower.includes('exam')) {
+                    chatPrompt = 'I\'m working through ' + filename + '. Can you help me answer and explain the questions in this practice exam?';
+                    chatLabel = '📝 Help Me Answer This Exam';
+                } else if (lower.includes('study_guide') || lower.includes('guide')) {
+                    chatPrompt = 'I\'m reading ' + filename + '. Can you explain the key concepts in this study guide and help me understand the tricky parts?';
+                    chatLabel = '🧠 Explain This Study Guide';
+                } else {
+                    chatPrompt = 'I\'m looking at ' + filename + '. Can you help me understand this document and explain anything I find confusing?';
+                    chatLabel = '💡 Help Me Understand This';
+                }
+                banner = `
+                <div class="mb-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg">
+                    <p class="text-sm text-indigo-300 mb-2">📄 This is a generated study document — chat with the agent to get help with its content.</p>
+                    <a href="/chat?prompt=${encodeURIComponent(chatPrompt)}"
+                       class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                        💬 ${chatLabel}
+                    </a>
+                </div>`;
+            }
             el.innerHTML = `
                 <div class="mb-4 flex items-center justify-between">
                     <h2 class="text-lg font-semibold text-slate-200">${filename}</h2>
                     <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
                        class="text-xs text-indigo-400 hover:text-indigo-300">↗ Raw file</a>
                 </div>
+                ${banner}
                 <div class="prose prose-invert prose-sm max-w-none file-preview-md">${marked.parse(text)}</div>
             `;
         } catch (e) {
             el.innerHTML = `<p class="text-red-400">Failed to load file: ${e.message}</p>`;
         }
     } else if (ext === 'pdf') {
+        const isLecture = path.startsWith('lectures/');
+        const lectureBanner = isLecture ? `
+            <div class="mb-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-lg">
+                <p class="text-sm text-indigo-300 mb-2">📒 This is an uploaded lecture — chat with the agent to get help understanding it.</p>
+                <a href="/chat?prompt=${encodeURIComponent('I\'ve uploaded ' + filename + '. Can you help explain the key topics and anything I find confusing in this lecture?')}"
+                   class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                    💬 Help Explain This Lecture
+                </a>
+            </div>` : '';
         el.innerHTML = `
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-slate-200">${filename}</h2>
                 <a href="/outputs/${encodeURIComponent(path)}" target="_blank"
                    class="text-xs text-indigo-400 hover:text-indigo-300">↗ Download</a>
             </div>
+            ${lectureBanner}
             <iframe src="/outputs/${encodeURIComponent(path)}" class="w-full rounded-lg border border-slate-700"
                     style="height: calc(100vh - 12rem)"></iframe>
         `;
@@ -262,6 +317,45 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ── Upload ──────────────────────────────────────────────────────────────
+
+async function uploadLecture(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const status = document.getElementById('upload-status');
+    status.classList.remove('hidden');
+    status.className = 'text-xs text-slate-400 mt-1.5 text-center';
+    status.textContent = 'Uploading…';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const resp = await fetch('/upload-lecture', { method: 'POST', body: formData });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            status.className = 'text-xs text-green-400 mt-1.5 text-center';
+            status.textContent = `✅ ${data.filename} uploaded`;
+            // Refresh file tree to show new file
+            await renderTree();
+        } else {
+            const err = await resp.json();
+            status.className = 'text-xs text-red-400 mt-1.5 text-center';
+            status.textContent = `❌ ${err.detail || 'Upload failed'}`;
+        }
+    } catch (e) {
+        status.className = 'text-xs text-red-400 mt-1.5 text-center';
+        status.textContent = `❌ ${e.message}`;
+    }
+
+    // Reset input so the same file can be re-uploaded if needed
+    input.value = '';
+
+    // Auto-hide status after 5s
+    setTimeout(() => { status.classList.add('hidden'); }, 5000);
 }
 
 // ── Init ───────────────────────────────────────────────────────────────

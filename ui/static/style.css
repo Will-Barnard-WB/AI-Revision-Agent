@@ -43,6 +43,16 @@ body {
     border-left: 3px solid var(--accent);
 }
 
+.sidebar a.no-highlight,
+.sidebar a.no-highlight:hover,
+.sidebar a.no-highlight:active,
+.sidebar a.no-highlight:focus {
+    background: none !important;
+    color: inherit !important;
+    border-left: none !important;
+    cursor: default;
+}
+
 /* Cards */
 .card {
     background: var(--bg-card);

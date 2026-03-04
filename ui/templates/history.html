@@ -2,38 +2,59 @@
 {% set active = "history" %}
 
 {% block content %}
-<div class="p-6 max-w-5xl">
+<div class="p-6">
     <header class="mb-6">
         <h2 class="text-lg font-semibold">📋 Task History</h2>
-        <p class="text-sm text-slate-500">Browse past tasks and generated outputs</p>
+        <p class="text-sm text-slate-500">Current session tasks, recent files, and persistent activity log</p>
     </header>
 
-    <!-- Tasks list -->
+    <!-- Session Tasks (live, in-memory) -->
     <div class="card mb-6">
-        <h3 class="text-sm font-medium text-slate-400 mb-3">Recent Tasks</h3>
+        <h3 class="text-sm font-medium text-slate-400 mb-3">🔄 Session Tasks</h3>
         <div id="tasks-list" hx-get="/tasks" hx-trigger="load, every 10s" hx-swap="innerHTML">
             Loading…
         </div>
     </div>
 
-    <!-- Output files -->
+    <!-- Recent Files -->
+    <div class="card mb-6">
+        <h3 class="text-sm font-medium text-slate-400 mb-3">📄 Recent Files</h3>
+        <div id="recent-files">Loading…</div>
+    </div>
+
+    <!-- Persistent History (from agent memory) -->
     <div class="card">
-        <h3 class="text-sm font-medium text-slate-400 mb-3">📁 Generated Files</h3>
-        <div id="outputs-list" hx-get="/outputs" hx-trigger="load, every 30s" hx-swap="innerHTML">
-            Loading…
+        <h3 class="text-sm font-medium text-slate-400 mb-3">📜 Activity Log</h3>
+        <div id="history-list">Loading…</div>
+    </div>
+</div>
+
+<!-- Preview Modal (fullscreen overlay) -->
+<div id="preview-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closePreview()"></div>
+    <div class="relative z-10 flex flex-col h-full">
+        <div class="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-700">
+            <h3 id="preview-title" class="text-sm font-semibold text-slate-200 truncate"></h3>
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <a id="preview-open-files" href="#" class="text-xs text-indigo-400 hover:text-indigo-300">📁 Open in Files</a>
+                <a id="preview-raw" href="#" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">↗ Raw</a>
+                <button onclick="closePreview()" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+            </div>
         </div>
+        <div id="preview-body" class="flex-1 overflow-y-auto p-6 bg-slate-950/90"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// ── Session Tasks (live) ───────────────────────────────────────────────
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.detail.target.id === 'tasks-list') {
         try {
             const tasks = JSON.parse(evt.detail.target.innerText);
             if (!Array.isArray(tasks) || tasks.length === 0) {
-                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No tasks yet. Go to Chat to start one.</p>';
+                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No tasks this session. Go to Chat to start one.</p>';
                 return;
             }
             let html = '<div class="space-y-3">';
@@ -50,54 +71,185 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
                 const time = t.created_at ? new Date(t.created_at).toLocaleString() : '';
                 const source = t.source === 'ambient' ? '🔄 Ambient' : '💬 User';
 
+                const convoSummary = t.conversation_summary || '';
+                const latestRequest = t.message || '';
+
                 html += `<div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                     <div class="flex justify-between items-start mb-1">
-                        <span class="text-sm font-medium text-slate-200 flex-1 mr-3">${t.message.substring(0, 120)}${t.message.length > 120 ? '…' : ''}</span>
+                        <span class="text-sm font-medium text-slate-200 flex-1 mr-3 break-words">${escapeHtml(latestRequest)}</span>
                         <span class="badge ${badge}">${statusIcon} ${t.status}</span>
                     </div>
                     <div class="flex gap-3 text-xs text-slate-500">
                         <span>${source}</span>
                         <span>${time}</span>
                         <span class="text-slate-600">ID: ${t.id}</span>
+                        ${Array.isArray(t.conversation_turns) ? `<span>${Math.floor(t.conversation_turns.length / 2)} turns</span>` : ''}
                     </div>
-                    ${t.result_summary ? `<div class="text-sm text-slate-300 mt-2 prose prose-invert prose-sm max-w-none">${typeof marked !== 'undefined' ? marked.parse(t.result_summary) : t.result_summary}</div>` : ''}
+                    ${convoSummary ? `<div class="mt-2 p-2 rounded bg-slate-900/40 border border-slate-700/70"><p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Conversation Summary</p><p class="text-sm text-slate-300 whitespace-pre-wrap break-words">${escapeHtml(convoSummary)}</p></div>` : ''}
                 </div>`;
             });
             html += '</div>';
             evt.detail.target.innerHTML = html;
         } catch(e) {}
     }
+});
 
-    if (evt.detail.target.id === 'outputs-list') {
-        try {
-            const files = JSON.parse(evt.detail.target.innerText);
-            if (!Array.isArray(files) || files.length === 0) {
-                evt.detail.target.innerHTML = '<p class="text-slate-500 text-sm">No output files yet.</p>';
-                return;
+// ── Recent Files + Persistent History ─────────────────────────────────
+const FILE_ICONS = { pdf: '📕', md: '📝', txt: '📄' };
+
+function getFileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    return FILE_ICONS[ext] || '📄';
+}
+
+async function loadHistory() {
+    const historyEl = document.getElementById('history-list');
+    const filesEl = document.getElementById('recent-files');
+    try {
+        const resp = await fetch('/api/history?limit=20');
+        const entries = await resp.json();
+
+        if (!Array.isArray(entries) || entries.length === 0) {
+            historyEl.innerHTML = '<p class="text-slate-500 text-sm">No activity recorded yet.</p>';
+            filesEl.innerHTML = '<p class="text-slate-500 text-sm">No files created yet.</p>';
+            return;
+        }
+
+        // ── Extract recent files from created/generated entries ─────────
+        const recentFiles = [];
+        const seen = new Set();
+        for (const entry of entries) {
+            if (entry.action === 'created' || entry.action === 'generated') {
+                // Try to extract filename from description like "Filename.md — ..."
+                const match = entry.description.match(/^([A-Za-z0-9_\-]+\.(md|pdf))/);
+                if (match && !seen.has(match[1])) {
+                    seen.add(match[1]);
+                    recentFiles.push({
+                        filename: match[1],
+                        ext: match[2],
+                        date: entry.date,
+                        description: entry.description
+                    });
+                }
             }
-            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-            files.forEach(f => {
-                const ext = f.name.split('.').pop().toLowerCase();
-                const icon = ext === 'pdf' ? '📕' : ext === 'md' ? '📝' : '📄';
-                const size = f.size > 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${f.size} B`;
-                const modified = new Date(f.modified).toLocaleDateString();
+            if (recentFiles.length >= 10) break;
+        }
 
-                html += `<a href="/outputs/${encodeURIComponent(f.name)}" target="_blank"
-                            class="p-3 bg-slate-800/50 rounded-lg border border-slate-700
-                                   hover:border-indigo-500/50 transition-colors group">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">${icon}</span>
-                        <div>
-                            <p class="text-sm font-medium text-slate-300 group-hover:text-indigo-400 transition-colors">${f.name}</p>
-                            <p class="text-xs text-slate-500">${size} · ${modified}</p>
+        // Render recent files as cards
+        if (recentFiles.length === 0) {
+            filesEl.innerHTML = '<p class="text-slate-500 text-sm">No files created yet.</p>';
+        } else {
+            let filesHtml = '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">';
+            for (const f of recentFiles) {
+                const icon = getFileIcon(f.filename);
+                // Keep full description text but remove filename prefix
+                const desc = f.description.replace(/^[A-Za-z0-9_\-]+\.(md|pdf)\s*—?\s*/, '');
+
+                filesHtml += `<a href="#" onclick="openPreview('${f.filename}', '${f.ext}'); return false;"
+                    class="p-4 bg-slate-800/50 rounded-lg border border-slate-700
+                           hover:border-indigo-500/50 transition-colors group">
+                    <div class="flex flex-col items-center text-center gap-2">
+                        <span class="text-2xl leading-none">${icon}</span>
+                        <div class="w-full">
+                            <p class="text-sm font-medium text-slate-300 group-hover:text-indigo-400 transition-colors break-words">${escapeHtml(f.filename)}</p>
+                            <p class="text-xs text-slate-500 mt-1 break-words">${escapeHtml(desc)}</p>
+                            <p class="text-xs text-slate-600 mt-1">${f.date}</p>
                         </div>
                     </div>
                 </a>`;
-            });
-            html += '</div>';
-            evt.detail.target.innerHTML = html;
-        } catch(e) {}
+            }
+            filesHtml += '</div>';
+            filesEl.innerHTML = filesHtml;
+        }
+
+        // ── Render full history log ────────────────────────────────────
+        let html = '<div class="space-y-2">';
+        entries.forEach(entry => {
+            const actionIcon = entry.action === 'created' ? '📝' :
+                               entry.action === 'research' ? '🔍' :
+                               entry.action === 'test' ? '🧪' :
+                               entry.action === 'processed' ? '🔄' :
+                               entry.action === 'generated' ? '✨' : '📌';
+            const actionBadge = entry.action === 'created' ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                entry.action === 'research' ? 'bg-blue-900/40 text-blue-400 border-blue-800' :
+                                entry.action === 'test' ? 'bg-amber-900/40 text-amber-400 border-amber-800' :
+                                'bg-slate-800 text-slate-400 border-slate-700';
+
+            const plain = entry.plain_summary || entry.description;
+            html += `<div class="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                <span class="text-lg leading-none">${actionIcon}</span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm text-slate-200">${escapeHtml(plain)}</p>
+                    ${entry.description && entry.description !== plain ? `<p class="text-xs text-slate-500 mt-1">${escapeHtml(entry.description)}</p>` : ''}
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs px-1.5 py-0.5 rounded border ${actionBadge}">${entry.action}</span>
+                        <span class="text-xs text-slate-500">${entry.date}</span>
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        historyEl.innerHTML = html;
+    } catch (e) {
+        historyEl.innerHTML = '<p class="text-red-400 text-sm">Failed to load history.</p>';
+        filesEl.innerHTML = '';
     }
+}
+
+// ── Preview Modal ──────────────────────────────────────────────────────
+async function openPreview(filename, ext) {
+    const modal = document.getElementById('preview-modal');
+    const body = document.getElementById('preview-body');
+    const title = document.getElementById('preview-title');
+    const rawLink = document.getElementById('preview-raw');
+    const filesLink = document.getElementById('preview-open-files');
+
+    const path = `documents/${filename}`;
+    const url = `/outputs/${encodeURIComponent(path)}`;
+
+    title.textContent = filename;
+    rawLink.href = url;
+    filesLink.href = `/files#${path}`;
+    body.innerHTML = '<div class="text-slate-500 text-center mt-20">Loading…</div>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    if (ext === 'md') {
+        try {
+            const resp = await fetch(url);
+            const text = await resp.text();
+            body.innerHTML = `<div class="prose prose-invert prose-sm max-w-none">${marked.parse(text)}</div>`;
+        } catch (e) {
+            body.innerHTML = `<p class="text-red-400 text-center mt-20">Failed to load file: ${e.message}</p>`;
+        }
+    } else if (ext === 'pdf') {
+        body.innerHTML = `<iframe src="${url}" class="w-full h-full rounded-lg border border-slate-700" style="min-height:80vh"></iframe>`;
+    } else {
+        try {
+            const resp = await fetch(url);
+            const text = await resp.text();
+            body.innerHTML = `<pre class="text-sm text-slate-300 whitespace-pre-wrap">${escapeHtml(text)}</pre>`;
+        } catch (e) {
+            body.innerHTML = `<p class="text-red-400 text-center mt-20">Failed to load file.</p>`;
+        }
+    }
+}
+
+function closePreview() {
+    document.getElementById('preview-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePreview();
 });
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', loadHistory);
 </script>
 {% endblock %}

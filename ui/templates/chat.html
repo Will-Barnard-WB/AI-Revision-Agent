@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% set active = "chat" %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="flex flex-col h-screen">
     <!-- Header -->
@@ -48,6 +54,32 @@
 let currentTaskId = null;
 let ws = null;
 let taskCompleted = false;   // true once the current task is completed
+
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        gfm: true,
+        breaks: true,
+    });
+}
+
+function renderAgentMarkdown(mdText) {
+    const safe = mdText || 'Task completed.';
+    const html = (typeof marked !== 'undefined') ? marked.parse(safe) : safe;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+
+    if (typeof renderMathInElement === 'function') {
+        renderMathInElement(wrapper, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+            ],
+            throwOnError: false,
+        });
+    }
+    return wrapper.innerHTML;
+}
 
 function addMessage(type, content) {
     const messages = document.getElementById('chat-messages');
@@ -130,7 +162,7 @@ function connectWebSocket(taskId) {
             if (d.status === 'running') {
                 addSystemMsg('<span class="pulse-dot"></span> Agent is working…');
             } else if (d.status === 'completed') {
-                const rendered = typeof marked !== 'undefined' ? marked.parse(d.summary || 'Task completed.') : (d.summary || 'Task completed.');
+                const rendered = renderAgentMarkdown(d.summary || 'Task completed.');
                 addMessage('agent', rendered);
                 addSystemMsg('✅ Task completed');
                 taskCompleted = true;
@@ -144,6 +176,21 @@ function connectWebSocket(taskId) {
         }
     };
 }
+
+// Pre-fill chat input from URL query params (e.g. ?prompt=...)
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const prefill = params.get('prompt');
+    if (prefill) {
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.value = prefill;
+            input.focus();
+        }
+        // Clean URL without reloading
+        window.history.replaceState({}, '', '/chat');
+    }
+})();
 
 async function sendMessage(e) {
     e.preventDefault();

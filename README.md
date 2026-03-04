@@ -1,4 +1,78 @@
-# Revision Agent: AI-Powered Agentic Study System
+# RevisionAgent — Technical Recruiter Overview
+
+RevisionAgent is a production-style **agentic learning platform** that ingests lecture PDFs, retrieves grounded knowledge with RAG, generates study outputs, and integrates with Anki through MCP.
+
+It demonstrates end-to-end AI product engineering:
+
+- **Agent orchestration** (LangGraph Deep Agent + custom toolchain)
+- **Real-time web app** (FastAPI, WebSocket streaming, async task lifecycle)
+- **RAG pipeline** (PDF ingestion, chunking, embeddings, Chroma retrieval)
+- **External integration** (MCP client/server + AnkiConnect)
+- **Guardrailed autonomy** (tool limits + human approval interrupts)
+- **Persistent memory + observability** (memory sections, activity logs, plain-English summaries)
+
+## What this system does
+
+### User-facing capabilities
+- Chat-based revision assistant with markdown and math-rendered responses
+- File browser for generated documents and uploaded lectures
+- History page with conversation summaries and plain-English activity logs
+- Upload-to-process flow for lecture PDFs
+
+### Agent capabilities
+- Collection-aware semantic retrieval from ingested lecture notes
+- PDF ingestion into Chroma collections
+- Web-search fallback (bounded)
+- Memory updates across profile, collections, decks, preferences, activity
+- Anki deck/card operations via MCP tools
+
+### Autonomous background mode
+- Ambient loop watches `agent_fs/lectures/` for new PDFs
+- Auto-ingests, runs agent workflows, writes manifest/logs
+
+## Architecture at a glance
+
+```text
+UI (HTMX/Tailwind + JS)
+    -> FastAPI backend (server.py)
+            -> Task orchestration + WebSocket status stream
+            -> Approval interrupts for sensitive writes
+            -> History summarization + file endpoints
+
+Agent runtime (agent_factory.py)
+    -> Deep Agent + scope-first prompt policy (prompts.py)
+    -> Tools (tools.py): retrieval, ingest, web search, memory, MCP
+    -> Middleware caps for retrieval/web calls
+
+Knowledge layer
+    -> RAG pipeline (RAG.py) + ChromaDB persistence
+    -> Agent filesystem: lectures, documents, templates, memory
+
+Integrations
+    -> MCP Anki server (anki_mcp_server.py) via multi_server_mcp_client.py
+```
+
+## Key technical highlights
+
+1. **Bounded tool autonomy**: run/thread limits for retrieval and web search to prevent runaway traces.
+2. **Scope-first behavior**: broad requests are clarified before expensive fan-out retrieval.
+3. **Human-in-the-loop safety**: write operations can require explicit approve/reject.
+4. **Memory integrity**: lock-protected, atomic memory writes with normalized activity dates.
+5. **Readable observability**: compact task/activity summaries for easier debugging and UX.
+
+## Primary files to review
+
+- `server.py` — async task orchestration, APIs, streaming, summaries, history/files endpoints
+- `agent_factory.py` — model/tool composition, middleware limits, memory-injected prompt
+- `tools.py` — retrieval/ingestion/web/memory tools
+- `RAG.py` — collection lifecycle + retriever setup
+- `ambient.py` — autonomous polling/ingestion loop
+- `anki_mcp_server.py` — MCP adapter for Anki actions
+- `ui/templates/*` — chat/files/history/ambient UX
+
+---
+
+# Legacy README (older architecture notes)
 
 A sophisticated multi-agent orchestration system that combines **LangGraph deep agents**, **Model Context Protocol (MCP) servers**, and **AI tools** to automate study material generation, spaced repetition flashcard creation, and exam preparation.
 

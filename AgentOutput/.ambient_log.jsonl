@@ -121,3 +121,5 @@
 {"timestamp": "2026-02-26T07:09:54.515217+00:00", "event": "poll_complete", "summary": "No new PDFs found (0 total, 0 already processed)", "total_pdfs": 0, "already_processed": 0, "new_count": 0}
 {"timestamp": "2026-02-26T08:43:51.243658+00:00", "event": "poll_complete", "summary": "No new PDFs found (0 total, 0 already processed)", "total_pdfs": 0, "already_processed": 0, "new_count": 0}
 {"timestamp": "2026-02-26T10:13:32.025482+00:00", "event": "poll_complete", "summary": "No new PDFs found (0 total, 0 already processed)", "total_pdfs": 0, "already_processed": 0, "new_count": 0}
+{"timestamp": "2026-02-26T10:18:32.028394+00:00", "event": "poll_complete", "summary": "No new PDFs found (0 total, 0 already processed)", "total_pdfs": 0, "already_processed": 0, "new_count": 0}
+{"timestamp": "2026-02-26T10:23:32.030477+00:00", "event": "poll_complete", "summary": "No new PDFs found (0 total, 0 already processed)", "total_pdfs": 0, "already_processed": 0, "new_count": 0}

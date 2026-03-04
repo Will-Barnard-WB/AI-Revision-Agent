@@ -6,7 +6,7 @@ model:
   provider: "anthropic"
   name: "claude-sonnet-4-6"
   temperature: 0.0
-  max_tokens: 16384
+  max_tokens: 8192
 
 # Paths
 paths:
@@ -45,8 +45,16 @@ server:
 
 # Agent Limits
 limits:
-  max_retrieval_calls: 3           # per run (user turn)
+  max_retrieval_calls: 2           # per run (user turn)
   max_web_searches: 3              # per run (user turn)
-  retrieval_thread_limit: 15       # per conversation
+  retrieval_thread_limit: 6        # per conversation
   web_search_thread_limit: 10      # per conversation
   max_files_per_session: 5
+
+# Summary generation (history/session cards)
+summaries:
+  max_input_chars: 4000
+  max_output_chars: 600
+  max_task_summary_chars: 220
+  max_activity_summaries_per_request: 8
+  max_model_tokens: 700
