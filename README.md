@@ -77,18 +77,18 @@ cd Evals && python run_eval.py
 
 <table>
   <tr>
-    <td><img src="screenshots/home.png" width="380"/><br/><sub>Chat interface</sub></td>
-    <td><img src="screenshots/ambient.png" width="380"/><br/><sub>Ambient dashboard — cron status, processed PDFs, activity log</sub></td>
+    <td><img src="screenshots/image-1772898122081.png" width="380"/><br/><sub>Chat interface</sub></td>
+    <td><img src="screenshots/image-1772898139880.png" width="380"/><br/><sub>Ambient dashboard — cron status, processed PDFs, activity log</sub></td>
   </tr>
   <tr>
-    <td><img src="screenshots/approvals.png" width="380"/><br/><sub>Human-in-the-loop approval queue</sub></td>
-    <td><img src="screenshots/files.png" width="380"/><br/><sub>Agent-generated study guide with KaTeX-rendered math</sub></td>
+    <td><img src="screenshots/image-1772898151908.png" width="380"/><br/><sub>Human-in-the-loop approval queue</sub></td>
+    <td><img src="screenshots/image-1772898197999.png" width="380"/><br/><sub>Agent-generated study guide with KaTeX-rendered math</sub></td>
   </tr>
   <tr>
-    <td><img src="screenshots/history.png" width="380"/><br/><sub>Task history + persistent activity log</sub></td>
-    <td><img src="screenshots/langsmith-traces.png" width="380"/><br/><sub>LangSmith trace view — 108 runs, P50 3s, 2% error rate</sub></td>
+    <td><img src="screenshots/image-1772898210050.png" width="380"/><br/><sub>Task history + persistent activity log</sub></td>
+    <td><img src="screenshots/image-1772898227069.png" width="380"/><br/><sub>LangSmith trace view — 108 runs, P50 3s, 2% error rate</sub></td>
   </tr>
   <tr>
-    <td><img src="screenshots/langsmith-eval.png" width="380"/><br/><sub>LangSmith eval experiments — feedback, latency, token metrics across runs</sub></td>
+    <td><img src="screenshots/image-1772898304552.png" width="380"/><br/><sub>LangSmith eval experiments — feedback, latency, token metrics across runs</sub></td>
   </tr>
 </table>
