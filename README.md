@@ -90,5 +90,6 @@ cd Evals && python run_eval.py
   </tr>
   <tr>
     <td><img src="screenshots/image-1772898304552.png" width="380"/><br/><sub>LangSmith eval experiments — feedback, latency, token metrics across runs</sub></td>
+    <td><img src="screenshots/image-1772898764107.png" width="380"/><br/><sub>LangSmith waterfall trace with middleware stack, visible per model call</sub></td>
   </tr>
 </table>

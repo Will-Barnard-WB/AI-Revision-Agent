@@ -773,3 +773,4 @@
 {"timestamp": "2026-03-07T15:38:02.936083+00:00", "event": "poll_complete", "summary": "No new PDFs found (3 total, 3 already processed)", "total_pdfs": 3, "already_processed": 3, "new_count": 0}
 {"timestamp": "2026-03-07T15:43:55.949656+00:00", "event": "poll_complete", "summary": "No new PDFs found (3 total, 3 already processed)", "total_pdfs": 3, "already_processed": 3, "new_count": 0}
 {"timestamp": "2026-03-07T15:48:55.953015+00:00", "event": "poll_complete", "summary": "No new PDFs found (3 total, 3 already processed)", "total_pdfs": 3, "already_processed": 3, "new_count": 0}
+{"timestamp": "2026-03-07T15:53:55.955767+00:00", "event": "poll_complete", "summary": "No new PDFs found (3 total, 3 already processed)", "total_pdfs": 3, "already_processed": 3, "new_count": 0}
